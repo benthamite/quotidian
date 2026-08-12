@@ -1,74 +1,113 @@
-#+TITLE: quotidian
-#+AUTHOR: Pablo Stafforini
-#+OPTIONS: toc:2
+#+title: quotidian: Display quotations from authoritative sources
+#+author: Pablo Stafforini
+#+email: pablo@stafforini.com
+#+language: en
+#+options: ':t toc:t author:t email:t num:t
+#+startup: content
+#+export_file_name: quotidian.info
+#+texinfo_filename: quotidian.info
+#+texinfo_dir_category: Emacs misc features
+#+texinfo_dir_title: Quotidian: (quotidian)
+#+texinfo_dir_desc: Display quotations from authoritative sources
+#+texinfo_header: @c AUTO-GENERATED from README.org via ox-texinfo — do not edit manually.
 
-=quotidian= displays quotations from the Oxford Dictionary of Quotations and
-other authoritative sources, either one at a time in a review buffer or in the
-echo area while you wait for something else to finish.
+This manual describes the features and customization options for the Emacs Lisp files =quotidian.el= and =quotidian-review.el=.
 
-The package ships public-domain quotations only. To read material from a
-dictionary that is still under copyright, transcribe it into a corpus file of
-your own and add that file to ~quotidian-corpus-files~.
+* Overview
+:PROPERTIES:
+:CUSTOM_ID: h:overview
+:END:
+
+=quotidian.el= shows quotations from the Oxford Dictionary of Quotations and other authoritative sources.  Quotations live in plain JSON files, so the corpus is yours to extend, and the package reads them once per Emacs session and keeps them in memory.
+
+There are two ways to read them:
+
+- *In the echo area*, one quotation at a time, while you wait for something else to finish.  The command ~quotidian-echo~ writes a quotation where Emacs writes its own messages, without adding it to =*Messages*=, and is meant to be called from a hook that fires when a long operation starts ([[#h:echo-area][Showing a quotation in the echo area]]).
+- *In a review buffer*, one quotation to a screen, centred horizontally and vertically in a frame with no other window.  The command ~quotidian~ opens it, and single keys move through the quotations, copy them, and leave ([[#h:review-buffer][Reading quotations in a review buffer]]).
+
+The two entry points share one corpus, one formatter, and three faces, so a quotation looks the same wherever it appears: the text first, then the author and date, then the source on an indented line of its own ([[#h:faces][Faces]]).
+
+The package requires Emacs 29.1 or later and depends only on libraries bundled with Emacs: =cl-lib=, =seq=, =subr-x=, and the built-in JSON parser.
+
+The development repository is on [[https://github.com/benthamite/quotidian][GitHub]].
+
+** Quotations and copyright
+:PROPERTIES:
+:CUSTOM_ID: h:copyright
+:END:
+
+The package ships public-domain quotations only.  The bundled corpus, =data/quotidian-sample.json=, holds twenty of them.
+
+A dictionary of quotations that is still under copyright cannot be redistributed here, and none of its contents are.  If you want to read from one, transcribe the material into a corpus file of your own, keep that file private, and add it to ~quotidian-corpus-files~ ([[#h:corpus-files][Corpus files]]).  The package treats your files and the bundled one alike.
 
 * Installation
+:PROPERTIES:
+:CUSTOM_ID: h:installation
+:END:
 
-* Usage
+** The =data= directory is part of the package
+:PROPERTIES:
+:CUSTOM_ID: h:data-directory
+:END:
 
-Quotidian reads quotations from the files listed in ~quotidian-corpus-files~,
-a list of file paths read in order. The package ships a sample corpus of
-public-domain quotations; add a file of your own to the list to include more.
+The bundled corpus lives in the =data= subdirectory of the repository, and ~quotidian-corpus-files~ points at it relative to the file the package was loaded from ([[#h:corpus-files-option][The corpus files]]).
 
-If you edit a corpus file while Emacs is running, call ~quotidian-reload~ to
-re-read the files and discard the cached quotations.
+Package managers that build a package by copying a subset of its repository — Elpaca and straight.el among them — copy Lisp files and documentation by default, and nothing else.  Under those managers the =data= directory never reaches the build directory, the default corpus path resolves to a file that is not there, and the package finds no quotations at all: ~quotidian~ signals =No quotations found; check `quotidian-corpus-files'=, and ~quotidian-echo~ shows nothing.
 
-** Echo area
+*The recipe must therefore name the =data= directory explicitly*, as the snippets below do.  If you install with =package-vc=, or by cloning the repository yourself, the whole repository is on disk already and no files directive is needed.
 
-Call ~quotidian-echo~ from any hook that fires when you are waiting:
+** Manual installation
+:PROPERTIES:
+:CUSTOM_ID: h:manual-installation
+:END:
+
+Clone the repository, keeping its =data= directory, add it to your load path, and require the package:
 
 #+begin_src emacs-lisp
-(add-hook 'compilation-start-hook (lambda (_process) (quotidian-echo)))
+(add-to-list 'load-path "/path/to/quotidian/")
+(require 'quotidian)
+(require 'quotidian-review)
 #+end_src
 
-~quotidian-echo~ never writes to ~*Messages*~, and always returns nil.
-Corpus entries with a malformed optional field are dropped when the
-corpus is read, not when it is displayed, so they cannot make this
-command signal.
+Requiring =quotidian-review.el= is what defines the ~quotidian~ command.  Under a package manager no ~require~ is needed: ~quotidian~ and ~quotidian-echo~ are autoloaded, so ~:defer t~ is safe, and calling either of them loads the rest of the package — ~quotidian-reload~ among it ([[#h:reloading][Reloading the corpus]]).
 
-~quotidian-echo-max-lines~ (default 4) bounds how tall the quotation may
-be, but the echo area cannot grow past what ~resize-mini-windows~ and
-~max-mini-window-height~ allow either; ~quotidian-echo~ uses whichever
-limit is smaller, so a quotation it chooses to show is never cut off —
-though on a short frame, or with ~resize-mini-windows~ set to nil, that
-may mean fewer lines than ~quotidian-echo-max-lines~ asks for.
+** Installation with use-package
+:PROPERTIES:
+:CUSTOM_ID: h:installation-with-use-package
+:END:
 
-** Review buffer
+If you use ~use-package~, add one of the following snippets to your init file:
 
-Call ~quotidian~ to read quotations one at a time, in a full-frame buffer:
-the current quotation is centred both horizontally and vertically, wrapped
-at ~quotidian-review-fill-column~ (default 64) columns. Key hints appear
-on the mode line rather than in the buffer text.
+#+begin_src emacs-lisp
+;; with elpaca
+(use-package quotidian
+  :ensure (:host github
+           :repo "benthamite/quotidian"
+           :files (:defaults "data"))
+  :defer t)
 
-| Key   | Action                                        |
-|-------+------------------------------------------------|
-| ~n~   | Show the next quotation                       |
-| ~p~   | Show the quotation seen before this one       |
-| ~w~   | Copy the quotation and its attribution        |
-| ~q~   | Quit, restoring the previous window layout    |
+;; with straight
+(use-package quotidian
+  :straight (:host github
+             :repo "benthamite/quotidian"
+             :files (:defaults "data")))
 
-A prefix argument to ~w~ copies the text of the quotation without its
-attribution. Quotations already seen are kept in a per-buffer history, so
-~n~ and ~p~ step back and forth through them without redrawing at random;
-~n~ only draws a new quotation once the end of the history is reached, and
-signals if the corpus has since become empty.
-
-Calling ~quotidian~ again while the review buffer is already open shows a
-new quotation without disturbing the history or the layout it will
-restore; the layout is restored on ~q~, and just as well by killing the
-buffer any other way.
+;; with vc (Emacs 30 or later)
+(use-package quotidian
+  :vc (:url "https://github.com/benthamite/quotidian"))
+#+end_src
 
 * Corpus files
+:PROPERTIES:
+:CUSTOM_ID: h:corpus-files
+:END:
 
-Each corpus file is a JSON array of objects, one per quotation:
+** File format
+:PROPERTIES:
+:CUSTOM_ID: h:file-format
+:END:
+
+A corpus file is a JSON array of objects, one object per quotation:
 
 #+begin_src json
 [
@@ -82,32 +121,236 @@ Each corpus file is a JSON array of objects, one per quotation:
 ]
 #+end_src
 
-| Key      | Required | Meaning                      |
-|----------+----------+-------------------------------|
-| ~text~   | yes      | The quotation itself          |
-| ~author~ | yes      | Who said or wrote it          |
-| ~source~ | no       | Where the quotation is from   |
-| ~date~   | no       | When it was said or written   |
-| ~tags~   | no       | A list of category strings    |
+| Key      | Required | Type             | Meaning                     |
+|----------+----------+------------------+-----------------------------|
+| =text=   | yes      | non-empty string | The quotation itself        |
+| =author= | yes      | non-empty string | Who said or wrote it        |
+| =source= | no       | string           | Where the quotation is from |
+| =date=   | no       | string           | When it was said or written |
+| =tags=   | no       | list             | Category strings            |
 
-An entry with no ~text~ or no ~author~, or with an empty ~text~, is dropped.
-So is an entry whose ~date~ or ~source~ is present but not a string, or
-whose ~tags~ is present but not a list. ~tags~ is otherwise kept on each
-quotation, but nothing in the package reads it yet.
+Both =date= and =tags= are free-form: =date= is a string, not a number, so =399 BC= and =1777= are equally acceptable, but =1777= without the quotation marks is not.  The package keeps =tags= on each quotation but nothing reads it yet; it is there for filtering that has not been written.
 
-A corpus file that cannot be read — missing, a directory, or otherwise
-inaccessible — or that is not valid JSON, is skipped rather than
-signaling an error.
+** Entries and files that are rejected
+:PROPERTIES:
+:CUSTOM_ID: h:rejected-entries
+:END:
 
-Every skipped file and every dropped entry is logged to ~*Warnings*~,
-quietly — the buffer is not popped open. To check on your corpus, call
-~quotidian-reload~; it reports how many quotations loaded, how many
-files were skipped, and how many entries were dropped.
+An entry is dropped, and the rest of the file is kept, when any of the following holds:
 
-A quotation's text and attribution are wrapped to fit the display width.
+- =text= is missing, is not a string, or is the empty string.
+- =author= is missing, is not a string, or is the empty string.
+- =source= or =date= is present but is not a string.
+- =tags= is present but is not a list.
+
+A whole file is skipped when it cannot be read — because it is missing, is not readable, or fails for any other file error — or when its contents are not valid JSON.
+
+** Warnings and reloading
+:PROPERTIES:
+:CUSTOM_ID: h:warnings-and-reloading
+:END:
+
+#+findex: quotidian-reload
+
+Neither kind of failure signals an error and neither interrupts what you were doing.  Both are logged to =*Warnings*=, quietly: the buffer is written to but never popped up.  A skipped file is logged with its name and the reason; dropped entries are logged as *one line per file*, giving the number dropped and the file they came from, not the entries themselves.  To find the offending entry you must inspect the file.
+
+The corpus is read on first use and then cached for the rest of the session.  If you edit a corpus file, or add one to ~quotidian-corpus-files~, call =M-x quotidian-reload=.  It discards the cache, reads the files again, and reports the outcome in the echo area:
+
+#+begin_example
+Quotidian: 20 quotations, 0 files skipped, 0 entries dropped
+#+end_example
+
+Since the counts are the visible half of a log that never shows itself, ~quotidian-reload~ is also the way to check on a corpus you have just written: a number of dropped entries greater than zero tells you to read =*Warnings*=.
+
+* User options
+:PROPERTIES:
+:CUSTOM_ID: h:user-options
+:END:
+
+All user options belong to the ~quotidian~ customization group.  You can browse them interactively with =M-x customize-group RET quotidian RET=.
+
+** The corpus files
+:PROPERTIES:
+:CUSTOM_ID: h:corpus-files-option
+:END:
+
+#+vindex: quotidian-corpus-files
+
+The user option ~quotidian-corpus-files~ is the list of files holding quotations, read in order.  Its default value is a one-element list holding the path of the bundled corpus, =data/quotidian-sample.json=, resolved relative to the directory the package was loaded from ([[#h:data-directory][The data directory is part of the package]]).
+
+Add your own files to the list to read more than the bundled twenty:
+
+#+begin_src emacs-lisp
+(add-to-list 'quotidian-corpus-files "~/quotations/oxford.json" t)
+#+end_src
+
+Every file is read and the quotations are pooled; a quotation is then chosen from the pool at random, so a file ten times the size of another contributes ten times as often.  Removing the bundled file from the list leaves only your own.  Changing the option takes effect after ~quotidian-reload~ ([[#h:warnings-and-reloading][Warnings and reloading]]).
+
+** The height of the echo area
+:PROPERTIES:
+:CUSTOM_ID: h:echo-max-lines-option
+:END:
+
+#+vindex: quotidian-echo-max-lines
+
+The user option ~quotidian-echo-max-lines~ is the greatest height, in lines, of a quotation shown in the echo area.  The value is a non-negative integer and the default is =4=.
+
+A quotation that needs more lines than this is passed over: ~quotidian-echo~ draws another one instead of shortening the one it drew ([[#h:echo-area][Showing a quotation in the echo area]]).  Raise the option to see long quotations, at the price of a mini-window that jumps up four or five lines while you are working; lower it to =2= to keep the interruption to the size of an ordinary message.
+
+Emacs will not necessarily give you the height you ask for.  The echo area cannot grow past what ~resize-mini-windows~ and ~max-mini-window-height~ allow, and the package uses whichever of the two limits is smaller, so a quotation it decides to show is never cut off.  On a short frame, or with ~resize-mini-windows~ set to ~nil~ — which pins the echo area to a single line — the effective limit is below ~quotidian-echo-max-lines~ and short quotations are the only ones you will see.
+
+** The width of the review buffer
+:PROPERTIES:
+:CUSTOM_ID: h:review-fill-column-option
+:END:
+
+#+vindex: quotidian-review-fill-column
+
+The user option ~quotidian-review-fill-column~ is the width, in columns, at which quotations are wrapped in the review buffer.  The value is an integer and the default is =64=.
+
+This is a measure of line length for reading, not a use of the frame's width: the wrapped block is centred in the window, so a wide frame gives wide margins rather than long lines.  The option is defined in =quotidian-review.el= and has no effect on ~quotidian-echo~, which wraps to the width of the echo area instead.
 
 * Faces
+:PROPERTIES:
+:CUSTOM_ID: h:faces
+:END:
 
-- ~quotidian-quote~ styles the text of a quotation.
-- ~quotidian-author~ styles the author, and the date if there is one.
-- ~quotidian-source~ styles the source, if there is one.
+#+vindex: quotidian-quote
+#+vindex: quotidian-author
+#+vindex: quotidian-source
+
+Three faces style the parts of a quotation, in the echo area and the review buffer alike.
+
+| Face               | Inherits from           | Applies to                      |
+|--------------------+-------------------------+---------------------------------|
+| ~quotidian-quote~  | ~default~               | The text of the quotation       |
+| ~quotidian-author~ | ~font-lock-string-face~ | The author, and the date if any |
+| ~quotidian-source~ | ~shadow~                | The source, if any              |
+
+The defaults inherit rather than set attributes, so they follow your theme.  Customize them when you want the attribution to recede further, or the text of the quotation to stand out:
+
+#+begin_src emacs-lisp
+(custom-set-faces
+ '(quotidian-quote ((t :slant italic))))
+#+end_src
+
+Prefer attributes that leave the character grid alone.  Both the line counting that decides whether a quotation fits in the echo area and the centring in the review buffer measure text in columns, so a face that changes the height or the width of a character makes those measurements approximate.
+
+* Commands
+:PROPERTIES:
+:CUSTOM_ID: h:commands
+:END:
+
+** Showing a quotation in the echo area
+:PROPERTIES:
+:CUSTOM_ID: h:echo-area
+:END:
+
+#+findex: quotidian-echo
+
+The command ~quotidian-echo~ shows one quotation, chosen at random, in the echo area.  It is written to be called from a hook that fires when you are about to wait — a compilation, a long ~shell-command~, a package update:
+
+#+begin_src emacs-lisp
+(add-hook 'compilation-start-hook (lambda (_process) (quotidian-echo)))
+#+end_src
+
+Because it is meant to run unattended, the command is quiet in every failing case rather than signalling.  It does nothing at all when the minibuffer is in use, so it cannot overwrite a prompt you are answering; it does nothing when the corpus is empty; and it does nothing when no quotation fits.  In all cases it returns ~nil~, which makes it safe on a hook whose return value matters.
+
+Fitting is decided by drawing.  The command draws a quotation at random, wraps it to the width of the echo area, and counts the display lines the result occupies — counting a line too wide to fit as the several lines Emacs will wrap it into.  If the count is within the limit described under ~quotidian-echo-max-lines~ ([[#h:echo-max-lines-option][The height of the echo area]]), that quotation is shown; otherwise the command draws again, up to twenty times, and then gives up silently.  Nothing is ever truncated, and nothing is ever abbreviated with an ellipsis: a quotation either appears whole or does not appear.
+
+The quotation is not written to =*Messages*=.  This is deliberate: a quotation shown once while you waited should not push your real messages out of the log.
+
+Malformed corpus entries cannot make this command signal, because entries are validated when the corpus is read, not when a quotation is displayed ([[#h:rejected-entries][Entries and files that are rejected]]).
+
+** Reading quotations in a review buffer
+:PROPERTIES:
+:CUSTOM_ID: h:review-buffer
+:END:
+
+#+findex: quotidian
+#+findex: quotidian-review-mode
+
+The command ~quotidian~ opens the =*quotidian*= buffer, deletes the other windows, and draws a quotation in the middle of the frame: wrapped at ~quotidian-review-fill-column~ ([[#h:review-fill-column-option][The width of the review buffer]]), centred horizontally, and padded from the top so that it sits at the vertical centre.  The buffer is in ~quotidian-review-mode~, a mode derived from ~special-mode~; the cursor is hidden, and the key hints occupy the mode line rather than a line of buffer text.  Resizing the window redraws the quotation at the new size.
+
+The command signals a ~user-error~ if the corpus holds no quotations, since there is nothing to open the buffer for.  A corpus that reads as empty under a package manager is usually the missing =data= directory ([[#h:data-directory][The data directory is part of the package]]).
+
+Quotations you have seen are kept in a history, one per review buffer, so moving forwards and backwards walks the same sequence rather than drawing at random each time.  Calling ~quotidian~ again while the review buffer is already open adds a new quotation to the end of that history and shows it; it does not reset the history, and it does not overwrite the window layout the buffer will restore.
+
+*** Key bindings
+:PROPERTIES:
+:CUSTOM_ID: h:key-bindings
+:END:
+
+#+findex: quotidian-review-next
+#+findex: quotidian-review-previous
+#+findex: quotidian-review-copy
+#+findex: quotidian-review-quit
+#+vindex: quotidian-review-mode-map
+
+The keymap ~quotidian-review-mode-map~ binds five keys:
+
+| Key   | Command                     | Description                                 |
+|-------+-----------------------------+---------------------------------------------|
+| =n=   | ~quotidian-review-next~     | Show the next quotation                     |
+| =SPC= | ~quotidian-review-next~     | The same, under the thumb                   |
+| =p=   | ~quotidian-review-previous~ | Show the quotation seen before this one     |
+| =w=   | ~quotidian-review-copy~     | Copy the quotation and its attribution      |
+| =q=   | ~quotidian-review-quit~     | Leave, restoring the previous window layout |
+
+Every other key keeps the binding ~special-mode~ gives it.
+
+The command ~quotidian-review-next~ steps forward through the history when there is anything ahead, and draws a new quotation at random when there is not.  It signals a ~user-error~ if the corpus has become empty since the buffer was opened — if you emptied ~quotidian-corpus-files~ and reloaded, for instance — rather than showing an empty screen.
+
+The command ~quotidian-review-previous~ steps back one quotation.  At the oldest quotation in the history it reports =No earlier quotation= and stays where it is.
+
+The command ~quotidian-review-copy~ copies the current quotation and its attribution to the kill ring, without text properties.  What you get is the quotation as ~quotidian-format~ builds it ([[#h:formatting][Formatting a quotation]]) — neither wrapped nor centred, unlike the buffer you are looking at — so that it lands in whatever you paste it into at that text's own width.  With a prefix argument (=C-u w=) it copies the text of the quotation alone, which is what you want when you are quoting inside your own sentence.  It reports =Copied= either way.
+
+The command ~quotidian-review-quit~ kills the review buffer and puts the windows back as they were before the review began.  The layout is restored by a ~kill-buffer-hook~, so it is restored equally when you kill the buffer some other way — =C-x k=, ~kill-some-buffers~, or a session cleanup.  The command refuses, with a ~user-error~, if it is somehow called outside a review buffer.
+
+** Reloading the corpus
+:PROPERTIES:
+:CUSTOM_ID: h:reloading
+:END:
+
+#+findex: quotidian-reload
+
+The command ~quotidian-reload~ discards the cached quotations, reads ~quotidian-corpus-files~ again, and reports how many quotations were loaded, how many files were skipped, and how many entries were dropped.  Call it after editing a corpus file, after adding one to the option, and whenever the number of quotations on offer surprises you ([[#h:warnings-and-reloading][Warnings and reloading]]).
+
+* Functions
+:PROPERTIES:
+:CUSTOM_ID: h:functions
+:END:
+
+** Formatting a quotation
+:PROPERTIES:
+:CUSTOM_ID: h:formatting
+:END:
+
+#+findex: quotidian-format
+
+The function ~quotidian-format~ takes a quotation — a plist with the keys ~:text~ and ~:author~, and optionally ~:source~ and ~:date~ — and returns it as a propertized string, faced as described under [[#h:faces][Faces]].  The text comes first; the author, followed by the date if there is one, occupies the next line after an em dash; the source, if there is one, occupies a third line, indented by two spaces:
+
+#+begin_example
+The unexamined life is not worth living.
+— Socrates, 399 BC
+  Plato, Apology 38a
+#+end_example
+
+The string is unwrapped: the caller decides the width.  This is the function to call if you want to show a quotation somewhere the package does not, such as a dashboard or a scratch buffer, and it is what ~quotidian-review-copy~ copies ([[#h:key-bindings][Key bindings]]).
+
+* Indices
+:PROPERTIES:
+:CUSTOM_ID: h:indices
+:END:
+
+** Function index
+:PROPERTIES:
+:INDEX: fn
+:CUSTOM_ID: h:function-index
+:END:
+
+** Variable index
+:PROPERTIES:
+:INDEX: vr
+:CUSTOM_ID: h:variable-index
+:END:
