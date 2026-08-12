@@ -312,16 +312,72 @@ selection deterministic, so the tests need no control over randomness."
   (quotidian-test-with-corpus nil
     (should-error (quotidian) :type 'user-error)))
 
+(defun quotidian-test-window-buffers ()
+  "Return the names of the buffers shown in the windows of this frame."
+  (mapcar (lambda (window) (buffer-name (window-buffer window)))
+          (window-list)))
+
 (ert-deftest quotidian-test-review-quit-restores-windows ()
   (let ((file (make-temp-file "quotidian-test" nil ".json"
                               "[{\"text\": \"Quit.\", \"author\": \"A\"}]")))
     (unwind-protect
         (quotidian-test-with-corpus (list file)
-          (let ((before (current-buffer)))
+          (save-window-excursion
+            (delete-other-windows)
+            (split-window)
+            (let ((before (quotidian-test-window-buffers)))
+              (quotidian)
+              (quotidian-review-quit)
+              (should (equal (quotidian-test-window-buffers) before))
+              (should (null (get-buffer "*quotidian*"))))))
+      (delete-file file))))
+
+(ert-deftest quotidian-test-review-second-call-does-not-clobber-configuration ()
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"One.\", \"author\": \"A\"}]")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (save-window-excursion
+            (delete-other-windows)
+            (split-window)
+            (let ((before (quotidian-test-window-buffers)))
+              (quotidian)
+              (quotidian-review-next)
+              (quotidian)
+              (quotidian-review-quit)
+              (should (equal (quotidian-test-window-buffers) before))
+              (should (null (get-buffer "*quotidian*"))))))
+      (delete-file file))))
+
+(ert-deftest quotidian-test-review-kill-buffer-restores-windows ()
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"Killed.\", \"author\": \"A\"}]")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (save-window-excursion
+            (delete-other-windows)
+            (split-window)
+            (let ((before (quotidian-test-window-buffers)))
+              (quotidian)
+              (kill-buffer "*quotidian*")
+              (should (equal (quotidian-test-window-buffers) before)))))
+      (delete-file file))))
+
+(ert-deftest quotidian-test-review-next-signals-on-empty-corpus ()
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"Only.\", \"author\": \"A\"}]")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (save-window-excursion
             (quotidian)
-            (quotidian-review-quit)
-            (should (eq (current-buffer) before))
-            (should (null (get-buffer "*quotidian*")))))
+            (unwind-protect
+                (progn
+                  (let ((quotidian-corpus-files nil)
+                        (quotidian--corpus 'unset))
+                    (should-error (quotidian-review-next) :type 'user-error))
+                  (should (equal (plist-get (quotidian-review--current) :text)
+                                 "Only.")))
+              (kill-buffer "*quotidian*"))))
       (delete-file file))))
 
 (provide 'quotidian-test)

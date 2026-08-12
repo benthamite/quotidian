@@ -60,18 +60,21 @@
     (user-error "No quotations found; check `quotidian-corpus-files'"))
   (let ((configuration (current-window-configuration)))
     (switch-to-buffer (get-buffer-create "*quotidian*"))
-    (quotidian-review-mode)
-    (setq quotidian-review--window-configuration configuration)
+    (unless (derived-mode-p 'quotidian-review-mode)
+      (quotidian-review-mode)
+      (setq quotidian-review--window-configuration configuration))
     (delete-other-windows)
-    (quotidian-review--push (quotidian--select))
+    (quotidian-review--push (quotidian-review--draw))
     (quotidian-review--render)))
 
 (define-derived-mode quotidian-review-mode special-mode "Quotidian"
   "Major mode for reading quotations one at a time."
   (setq-local cursor-type nil)
   (setq-local mode-line-format
-              (propertize " n next   p previous   w copy   q quit" 'face 'shadow))
-  (add-hook 'window-size-change-functions #'quotidian-review--resize nil t))
+              (propertize " n next   p previous   w copy   q quit"
+                          'face 'shadow))
+  (add-hook 'window-size-change-functions #'quotidian-review--resize nil t)
+  (add-hook 'kill-buffer-hook #'quotidian-review--restore-windows nil t))
 
 (defun quotidian-review-next ()
   "Show the next quotation.
@@ -80,7 +83,7 @@ otherwise step forward through quotations already seen."
   (interactive)
   (if (< quotidian-review--index (1- (length quotidian-review--history)))
       (setq quotidian-review--index (1+ quotidian-review--index))
-    (quotidian-review--push (quotidian--select)))
+    (quotidian-review--push (quotidian-review--draw)))
   (quotidian-review--render))
 
 (defun quotidian-review-previous ()
@@ -104,9 +107,15 @@ without the attribution."
 (defun quotidian-review-quit ()
   "Leave the review and put the windows back as they were."
   (interactive)
-  (let ((configuration quotidian-review--window-configuration))
-    (kill-buffer)
-    (when configuration (set-window-configuration configuration))))
+  (unless (derived-mode-p 'quotidian-review-mode)
+    (user-error "Not in a quotidian review buffer"))
+  (kill-buffer))
+
+(defun quotidian-review--draw ()
+  "Return a quotation chosen at random.
+Signal `user-error' if the corpus is empty."
+  (or (quotidian--select)
+      (user-error "No quotations found; check `quotidian-corpus-files'")))
 
 (defun quotidian-review--push (quote)
   "Add QUOTE to the end of the history and make it the current one."
@@ -118,31 +127,43 @@ without the attribution."
   "Return the quotation now shown."
   (nth quotidian-review--index quotidian-review--history))
 
-(defun quotidian-review--render ()
-  "Draw the current quotation in the middle of the window."
-  (let* ((inhibit-read-only t)
+(defun quotidian-review--render (&optional window)
+  "Draw the current quotation in the middle of WINDOW.
+WINDOW defaults to the selected window."
+  (let* ((window (or window (selected-window)))
+         (inhibit-read-only t)
+         (width (window-body-width window))
          (lines (split-string (quotidian--fill
                                (quotidian-format (quotidian-review--current))
                                quotidian-review-fill-column)
                               "\n")))
     (erase-buffer)
-    (insert (make-string (quotidian-review--top-padding (length lines)) ?\n))
-    (insert (mapconcat #'quotidian-review--centre lines "\n"))
+    (insert (make-string
+             (quotidian-review--top-padding (length lines) window) ?\n))
+    (insert (mapconcat (lambda (line) (quotidian-review--centre line width))
+                       lines "\n"))
     (goto-char (point-min))))
 
-(defun quotidian-review--top-padding (height)
-  "Return the number of blank lines that centre HEIGHT lines vertically."
-  (max 0 (/ (- (window-body-height) height) 2)))
+(defun quotidian-review--top-padding (height window)
+  "Return the number of blank lines that centre HEIGHT lines in WINDOW."
+  (max 0 (/ (- (window-body-height window) height) 2)))
 
-(defun quotidian-review--centre (line)
-  "Return LINE indented so that it sits in the middle of the window."
-  (concat (make-string (max 0 (/ (- (window-body-width) (string-width line)) 2)) ?\s)
+(defun quotidian-review--centre (line width)
+  "Return LINE indented to centre it in a window WIDTH columns wide."
+  (concat (make-string (max 0 (/ (- width (string-width line)) 2)) ?\s)
           line))
 
-(defun quotidian-review--resize (&optional _window)
-  "Draw the quotation again after the window changes size."
-  (when (eq major-mode 'quotidian-review-mode)
-    (quotidian-review--render)))
+(defun quotidian-review--restore-windows ()
+  "Restore the window configuration saved when the review began."
+  (when quotidian-review--window-configuration
+    (set-window-configuration quotidian-review--window-configuration)))
+
+(defun quotidian-review--resize (window)
+  "Draw the quotation again after WINDOW is resized."
+  (when (window-live-p window)
+    (with-current-buffer (window-buffer window)
+      (when (derived-mode-p 'quotidian-review-mode)
+        (save-match-data (quotidian-review--render window))))))
 
 (provide 'quotidian-review)
 ;;; quotidian-review.el ends here

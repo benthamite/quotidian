@@ -58,7 +58,13 @@ on the mode line rather than in the buffer text.
 A prefix argument to ~w~ copies the text of the quotation without its
 attribution. Quotations already seen are kept in a per-buffer history, so
 ~n~ and ~p~ step back and forth through them without redrawing at random;
-~n~ only draws a new quotation once the end of the history is reached.
+~n~ only draws a new quotation once the end of the history is reached, and
+signals if the corpus has since become empty.
+
+Calling ~quotidian~ again while the review buffer is already open shows a
+new quotation without disturbing the history or the layout it will
+restore; the layout is restored on ~q~, and just as well by killing the
+buffer any other way.
 
 * Corpus files
 
