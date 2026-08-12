@@ -21,6 +21,9 @@ public-domain quotations; add a file of your own to the list to include more.
 If you edit a corpus file while Emacs is running, call ~quotidian-reload~ to
 re-read the files and discard the cached quotations.
 
+A quotation too long to fit within the echo area is passed over rather than
+truncated; a shorter quotation is picked instead.
+
 * Corpus files
 
 Each corpus file is a JSON array of objects, one per quotation:

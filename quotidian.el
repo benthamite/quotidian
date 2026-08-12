@@ -29,6 +29,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'seq)
 
 (defgroup quotidian nil
@@ -148,6 +149,46 @@ source, if there is one, occupies a second indented line."
             (when source
               (concat "\n" (propertize (concat "  " source)
                                        'face 'quotidian-source))))))
+
+(defconst quotidian--echo-attempts 20
+  "How many quotations `quotidian-echo' tries before it gives up.")
+
+(defun quotidian--select ()
+  "Return a quotation chosen at random, or nil if the corpus is empty."
+  (when-let* ((corpus (quotidian--ensure-corpus)))
+    (seq-random-elt corpus)))
+
+(defun quotidian--select-fitting (max-lines width)
+  "Return a formatted quotation of at most MAX-LINES lines, filled at WIDTH.
+Return nil if `quotidian--echo-attempts' random draws all give a longer
+quotation, or if the corpus is empty.  The return value is the filled
+string, not the quotation itself."
+  (cl-loop repeat quotidian--echo-attempts
+           for quote = (quotidian--select)
+           while quote
+           for filled = (quotidian--fill (quotidian-format quote) width)
+           when (<= (quotidian--line-count filled) max-lines)
+           return filled))
+
+(defun quotidian--fill (string width)
+  "Return STRING with every line word-wrapped to WIDTH columns.
+Lines are filled one at a time, so the line breaks already in STRING
+survive."
+  (mapconcat (lambda (line) (quotidian--fill-line line width))
+             (split-string string "\n")
+             "\n"))
+
+(defun quotidian--fill-line (line width)
+  "Return LINE word-wrapped to WIDTH columns."
+  (with-temp-buffer
+    (insert line)
+    (let ((fill-column width))
+      (fill-region (point-min) (point-max)))
+    (buffer-string)))
+
+(defun quotidian--line-count (string)
+  "Return the number of lines in STRING."
+  (1+ (cl-count ?\n string)))
 
 (provide 'quotidian)
 ;;; quotidian.el ends here

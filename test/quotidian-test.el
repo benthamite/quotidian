@@ -105,5 +105,61 @@ state into each other."
     (should (eq (get-text-property 0 'face formatted) 'quotidian-quote))
     (should (eq (get-text-property 6 'face formatted) 'quotidian-author))))
 
+(ert-deftest quotidian-test-fill-wraps-at-width ()
+  (should (equal (quotidian--fill "one two three four five" 9)
+                 "one two\nthree\nfour five")))
+
+(ert-deftest quotidian-test-fill-preserves-existing-line-breaks ()
+  (should (equal (quotidian--fill "short\nalso short" 40)
+                 "short\nalso short")))
+
+(ert-deftest quotidian-test-fill-does-not-split-words ()
+  (should (seq-every-p (lambda (line) (<= (length line) 10))
+                       (split-string (quotidian--fill "aaa bbb ccc ddd eee" 10) "\n"))))
+
+(ert-deftest quotidian-test-line-count ()
+  (should (= (quotidian--line-count "one") 1))
+  (should (= (quotidian--line-count "one\ntwo") 2))
+  (should (= (quotidian--line-count "one\ntwo\nthree") 3)))
+
+(ert-deftest quotidian-test-select-returns-corpus-member ()
+  (quotidian-test-with-corpus (list (quotidian-test-fixture "valid.json"))
+    (should (member (quotidian--select) (quotidian--ensure-corpus)))))
+
+(ert-deftest quotidian-test-select-on-empty-corpus ()
+  (quotidian-test-with-corpus nil
+    (should (null (quotidian--select)))))
+
+(ert-deftest quotidian-test-select-fitting-returns-filled-string ()
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"Short.\", \"author\": \"A\"}]")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (should (equal (substring-no-properties (quotidian--select-fitting 4 40))
+                         "Short.\n— A")))
+      (delete-file file))))
+
+(ert-deftest quotidian-test-fill-keeps-source-indented-and-faced ()
+  (let* ((formatted (quotidian-format
+                      '(:text "Short." :author "Author"
+                        :source "A Long Source Title That Wraps Around")))
+         (filled (quotidian--fill formatted 20))
+         (lines (split-string filled "\n")))
+    (should (seq-every-p (lambda (line) (string-prefix-p "  " line))
+                         (last lines 3)))
+    (should (seq-every-p (lambda (line) (eq (get-text-property 0 'face line)
+                                            'quotidian-source))
+                         (last lines 3)))))
+
+(ert-deftest quotidian-test-select-fitting-rejects-long-quotes ()
+  (let ((file (make-temp-file
+               "quotidian-test" nil ".json"
+               (concat "[{\"text\": \"" (string-join (make-list 60 "word") " ")
+                       "\", \"author\": \"A\"}]"))))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (should (null (quotidian--select-fitting 2 40))))
+      (delete-file file))))
+
 (provide 'quotidian-test)
 ;;; quotidian-test.el ends here
