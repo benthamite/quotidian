@@ -172,11 +172,18 @@ WINDOW defaults to the selected window."
 
 (defun quotidian-review--restore-windows ()
   "Restore the window configuration saved when the review began.
-Do nothing unless the buffer being killed is on screen: killing a review
-buffer that is not displayed, from the buffer list or from a cleanup
-command, would otherwise throw away the layout the user is working in."
+Do nothing unless the buffer being killed is on screen, and on the frame
+the review began on.  Killing a review buffer that is not displayed,
+from the buffer list or from a cleanup command, would otherwise throw
+away the layout the user is working in.  Killing one displayed on a
+second frame would do the same to the first frame, and select it into
+the bargain: `set-window-configuration' selects the frame of the
+configuration it restores."
   (when (and quotidian-review--window-configuration
-             (get-buffer-window (current-buffer)))
+             (get-buffer-window (current-buffer))
+             (eq (window-configuration-frame
+                  quotidian-review--window-configuration)
+                 (selected-frame)))
     (set-window-configuration quotidian-review--window-configuration)))
 
 (defun quotidian-review--resize (window)

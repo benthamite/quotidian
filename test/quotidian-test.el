@@ -477,6 +477,29 @@ one the user is in by the time he kills the buffer from elsewhere."
       (kill-buffer first)
       (kill-buffer second))))
 
+(ert-deftest quotidian-test-review-killing-on-another-frame-keeps-layout ()
+  "Check that the restore is confined to the frame the review began on.
+Batch Emacs has one frame, so the saved configuration is stubbed to
+claim a frame that is not the selected one.  The buffer is on screen,
+so the two other conditions hold; the restore must be skipped all the
+same, since restoring here would throw away the layout of the frame the
+user is not on, and select that frame."
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"Framed.\", \"author\": \"A\"}]")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (save-window-excursion
+            (delete-other-windows)
+            (split-window)
+            (let ((before (quotidian-test-window-buffers)))
+              (quotidian)
+              (cl-letf (((symbol-function 'window-configuration-frame)
+                         (lambda (&rest _) 'a-frame-that-is-not-this-one)))
+                (kill-buffer "*quotidian*"))
+              (should (= (length (window-list)) 1))
+              (should-not (equal (quotidian-test-window-buffers) before)))))
+      (delete-file file))))
+
 (ert-deftest quotidian-test-review-next-signals-on-empty-corpus ()
   (let ((file (make-temp-file "quotidian-test" nil ".json"
                               "[{\"text\": \"Only.\", \"author\": \"A\"}]")))

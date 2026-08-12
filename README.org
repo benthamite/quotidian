@@ -315,7 +315,11 @@ The command ~quotidian-review-previous~ steps back one quotation.  At the oldest
 
 The command ~quotidian-review-copy~ copies the current quotation and its attribution to the kill ring, without text properties.  What you get is the quotation as ~quotidian-format~ builds it ([[#h:formatting][Formatting a quotation]]) — neither wrapped nor centred, unlike the buffer you are looking at — so that it lands in whatever you paste it into at that text's own width.  With a prefix argument (=C-u w=) it copies the text of the quotation alone, which is what you want when you are quoting inside your own sentence.  It reports =Copied= either way.
 
-The command ~quotidian-review-quit~ kills the review buffer and puts the windows back as they were before the review began.  The layout is restored by a ~kill-buffer-hook~, so it is restored equally when you kill the buffer some other way — =C-x k=, ~kill-some-buffers~, or a session cleanup — as long as the buffer is on screen at the time.  Killing a review buffer that is not displayed, from the buffer list say, leaves your windows alone: the layout the buffer remembers is the one the review replaced, and by then you are working in a later one.  The command refuses, with a ~user-error~, if it is somehow called outside a review buffer.
+The command ~quotidian-review-quit~ kills the review buffer and puts the windows back as they were before the review began.  The layout is restored by a ~kill-buffer-hook~, so it is restored equally when you kill the buffer some other way — =C-x k=, ~kill-some-buffers~, or a session cleanup.
+
+Two cases are deliberately left alone, because in both of them the layout the buffer remembers is not the one in front of you.  Killing a review buffer that is not displayed, from the buffer list say, leaves your windows as they are: by then you have moved on to a layout later than the one the review replaced.  Killing one that is displayed on a second frame leaves both frames as they are, for that reason and one more — the remembered layout belongs to the frame the review began on, so restoring it would undo that frame's later work and select the frame as well, taking you off the one you are using.  In short, the layout comes back when you end the review on the frame you started it on.
+
+The command refuses, with a ~user-error~, if it is somehow called outside a review buffer.
 
 ** Reloading the corpus
 :PROPERTIES:
