@@ -52,3 +52,9 @@ the package reads it yet.
 A corpus file that cannot be read — missing, a directory, or otherwise
 inaccessible — or that is not valid JSON, is skipped with a warning rather
 than signaling an error.
+
+* Faces
+
+- ~quotidian-quote~ styles the text of a quotation.
+- ~quotidian-author~ styles the author, and the date if there is one.
+- ~quotidian-source~ styles the source, if there is one.

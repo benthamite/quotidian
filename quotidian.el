@@ -115,5 +115,39 @@ Returning nil lets callers use this directly as a failure branch."
   (display-warning 'quotidian (apply #'format format args) :warning)
   nil)
 
+(defface quotidian-quote '((t :inherit default))
+  "Face for the text of a quotation."
+  :group 'quotidian)
+
+(defface quotidian-author '((t :inherit font-lock-string-face))
+  "Face for the author of a quotation."
+  :group 'quotidian)
+
+(defface quotidian-source '((t :inherit shadow))
+  "Face for the source of a quotation."
+  :group 'quotidian)
+
+(defun quotidian-format (quote)
+  "Return QUOTE as a propertized string.
+The text comes first, then the attribution on its own line.  QUOTE is a
+plist with the keys `:text', `:author', and optionally `:source' and
+`:date'."
+  (concat (propertize (plist-get quote :text) 'face 'quotidian-quote)
+          "\n"
+          (quotidian--format-attribution quote)))
+
+(defun quotidian--format-attribution (quote)
+  "Return the attribution of QUOTE as a propertized string.
+The author, and the date if there is one, occupy the first line.  The
+source, if there is one, occupies a second indented line."
+  (let ((date (plist-get quote :date))
+        (source (plist-get quote :source)))
+    (concat (propertize (concat "— " (plist-get quote :author)
+                                (when date (concat ", " date)))
+                        'face 'quotidian-author)
+            (when source
+              (concat "\n" (propertize (concat "  " source)
+                                       'face 'quotidian-source))))))
+
 (provide 'quotidian)
 ;;; quotidian.el ends here

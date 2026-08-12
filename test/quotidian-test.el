@@ -79,5 +79,31 @@ state into each other."
           (should (= (length (quotidian--ensure-corpus)) 2)))
       (delete-file file))))
 
+(ert-deftest quotidian-test-format-with-all-fields ()
+  (should (equal (substring-no-properties
+                  (quotidian-format '(:text "Text." :author "Author"
+                                      :date "1900" :source "Source")))
+                 "Text.\n— Author, 1900\n  Source")))
+
+(ert-deftest quotidian-test-format-without-source ()
+  (should (equal (substring-no-properties
+                  (quotidian-format '(:text "Text." :author "Author" :date "1900")))
+                 "Text.\n— Author, 1900")))
+
+(ert-deftest quotidian-test-format-without-date ()
+  (should (equal (substring-no-properties
+                  (quotidian-format '(:text "Text." :author "Author" :source "Source")))
+                 "Text.\n— Author\n  Source")))
+
+(ert-deftest quotidian-test-format-with-author-only ()
+  (should (equal (substring-no-properties
+                  (quotidian-format '(:text "Text." :author "Author")))
+                 "Text.\n— Author")))
+
+(ert-deftest quotidian-test-format-applies-faces ()
+  (let ((formatted (quotidian-format '(:text "Text." :author "Author"))))
+    (should (eq (get-text-property 0 'face formatted) 'quotidian-quote))
+    (should (eq (get-text-property 6 'face formatted) 'quotidian-author))))
+
 (provide 'quotidian-test)
 ;;; quotidian-test.el ends here
