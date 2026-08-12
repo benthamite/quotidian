@@ -1,0 +1,15 @@
+#+TITLE: quotidian
+#+AUTHOR: Pablo Stafforini
+#+OPTIONS: toc:2
+
+=quotidian= displays quotations from the Oxford Dictionary of Quotations and
+other authoritative sources, either one at a time in a review buffer or in the
+echo area while you wait for something else to finish.
+
+The package ships public-domain quotations only. To read material from a
+dictionary that is still under copyright, transcribe it into a corpus file of
+your own and add that file to ~quotidian-corpus-files~.
+
+* Installation
+
+* Usage
