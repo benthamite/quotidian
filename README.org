@@ -13,3 +13,38 @@ your own and add that file to ~quotidian-corpus-files~.
 * Installation
 
 * Usage
+
+Quotidian reads quotations from the files listed in ~quotidian-corpus-files~,
+a list of file paths read in order. The package ships a sample corpus of
+public-domain quotations; add a file of your own to the list to include more.
+
+If you edit a corpus file while Emacs is running, call ~quotidian-reload~ to
+re-read the files and discard the cached quotations.
+
+* Corpus files
+
+Each corpus file is a JSON array of objects, one per quotation:
+
+#+begin_src json
+[
+  {
+    "text": "The unexamined life is not worth living.",
+    "author": "Socrates",
+    "source": "Plato, Apology 38a",
+    "date": "399 BC",
+    "tags": ["philosophy"]
+  }
+]
+#+end_src
+
+| Key      | Required | Meaning                      |
+|----------+----------+-------------------------------|
+| ~text~   | yes      | The quotation itself          |
+| ~author~ | yes      | Who said or wrote it          |
+| ~source~ | no       | Where the quotation is from   |
+| ~date~   | no       | When it was said or written   |
+| ~tags~   | no       | A list of category strings    |
+
+An entry with no ~text~ or no ~author~, or with an empty ~text~, is dropped
+with a warning. ~tags~ is parsed and kept on each quotation, but nothing in
+the package reads it yet.

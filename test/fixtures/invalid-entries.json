@@ -1,0 +1,6 @@
+[
+  {"text": "A valid quotation.", "author": "Valid Author"},
+  {"text": "No author here."},
+  {"author": "No text here."},
+  {"text": "", "author": "Empty text"}
+]

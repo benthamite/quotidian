@@ -1,0 +1,132 @@
+[
+  {
+    "text": "When a man is tired of London, he is tired of life; for there is in London all that life can afford.",
+    "author": "Samuel Johnson",
+    "source": "Boswell, Life of Johnson",
+    "date": "1777",
+    "tags": ["london", "life"]
+  },
+  {
+    "text": "The unexamined life is not worth living.",
+    "author": "Socrates",
+    "source": "Plato, Apology 38a",
+    "date": "399 BC",
+    "tags": ["philosophy"]
+  },
+  {
+    "text": "I have gathered a posie of other men's flowers, and nothing but the thread that binds them is mine own.",
+    "author": "Michel de Montaigne",
+    "date": "1580"
+  },
+  {
+    "text": "Nothing is more difficult, and therefore more precious, than to be able to decide.",
+    "author": "Napoleon Bonaparte"
+  },
+  {
+    "text": "I think, therefore I am.",
+    "author": "René Descartes",
+    "source": "Discourse on the Method",
+    "date": "1637",
+    "tags": ["philosophy"]
+  },
+  {
+    "text": "Knowledge is power.",
+    "author": "Francis Bacon",
+    "source": "Meditationes Sacrae",
+    "date": "1597"
+  },
+  {
+    "text": "Call me Ishmael.",
+    "author": "Herman Melville",
+    "source": "Moby-Dick",
+    "date": "1851",
+    "tags": ["fiction"]
+  },
+  {
+    "text": "To be, or not to be, that is the question.",
+    "author": "William Shakespeare",
+    "source": "Hamlet, Act III, Scene I",
+    "tags": ["drama"]
+  },
+  {
+    "text": "Give me liberty, or give me death!",
+    "author": "Patrick Henry",
+    "source": "Speech to the Second Virginia Convention",
+    "date": "1775",
+    "tags": ["liberty"]
+  },
+  {
+    "text": "Early to bed, and early to rise, makes a man healthy, wealthy, and wise.",
+    "author": "Benjamin Franklin",
+    "source": "Poor Richard's Almanack",
+    "date": "1735"
+  },
+  {
+    "text": "It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom—and that government of the people, by the people, for the people, shall not perish from the earth.",
+    "author": "Abraham Lincoln",
+    "source": "Gettysburg Address",
+    "date": "1863",
+    "tags": ["liberty", "democracy"]
+  },
+  {
+    "text": "We hold these truths to be self-evident, that all men are created equal, that they are endowed by their Creator with certain unalienable Rights, that among these are Life, Liberty and the pursuit of Happiness. That to secure these rights, Governments are instituted among Men, deriving their just powers from the consent of the governed.",
+    "author": "Thomas Jefferson",
+    "source": "Declaration of Independence",
+    "date": "1776",
+    "tags": ["liberty", "democracy"]
+  },
+  {
+    "text": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
+    "author": "Jane Austen",
+    "source": "Pride and Prejudice",
+    "date": "1813",
+    "tags": ["fiction"]
+  },
+  {
+    "text": "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness, it was the epoch of belief, it was the epoch of incredulity, it was the season of Light, it was the season of Darkness, it was the spring of hope, it was the winter of despair.",
+    "author": "Charles Dickens",
+    "source": "A Tale of Two Cities",
+    "date": "1859",
+    "tags": ["fiction"]
+  },
+  {
+    "text": "A foolish consistency is the hobgoblin of little minds.",
+    "author": "Ralph Waldo Emerson",
+    "source": "Self-Reliance",
+    "date": "1841"
+  },
+  {
+    "text": "I went to the woods because I wished to live deliberately, to front only the essential facts of life, and see if I could not learn what it had to teach, and not, when I came to die, discover that I had not lived.",
+    "author": "Henry David Thoreau",
+    "source": "Walden",
+    "date": "1854",
+    "tags": ["life"]
+  },
+  {
+    "text": "The report of my death was an exaggeration.",
+    "author": "Mark Twain",
+    "source": "Cablegram to the Associated Press",
+    "date": "1897"
+  },
+  {
+    "text": "I can resist everything except temptation.",
+    "author": "Oscar Wilde",
+    "source": "Lady Windermere's Fan",
+    "date": "1892",
+    "tags": ["drama"]
+  },
+  {
+    "text": "Do I contradict myself? Very well then I contradict myself, I am large, I contain multitudes.",
+    "author": "Walt Whitman",
+    "source": "Leaves of Grass",
+    "date": "1855",
+    "tags": ["poetry"]
+  },
+  {
+    "text": "I am no bird; and no net ensnares me: I am a free human being with an independent will.",
+    "author": "Charlotte Brontë",
+    "source": "Jane Eyre",
+    "date": "1847",
+    "tags": ["fiction", "liberty"]
+  }
+]
