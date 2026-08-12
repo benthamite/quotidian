@@ -1,0 +1,8 @@
+# Byte-compiled and generated Lisp
+*.elc
+*.info
+
+# Agent scaffolding: design documents and session ledgers, kept on disk
+# but not published with the package.
+/docs/superpowers/
+/.superpowers/

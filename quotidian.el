@@ -1,11 +1,13 @@
 ;;; quotidian.el --- Display quotations from authoritative sources -*- lexical-binding: t -*-
 
-;; Copyright (C) 2026
+;; Copyright (C) 2026 Pablo Stafforini
 
-;; Author: Pablo Stafforini
+;; Author: Pablo Stafforini <pablo@stafforini.com>
+;; Maintainer: Pablo Stafforini <pablo@stafforini.com>
 ;; URL: https://github.com/benthamite/quotidian
 ;; Version: 0.1
 ;; Package-Requires: ((emacs "29.1"))
+;; Keywords: convenience
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -24,8 +26,10 @@
 
 ;;; Commentary:
 
-;; Display quotations from the Oxford Dictionary of Quotations and other
-;; authoritative sources, either in a review buffer or in the echo area.
+;; Display quotations, read from JSON corpus files, either in a review
+;; buffer or in the echo area.  A small corpus of public-domain
+;; quotations is bundled; add files of your own to
+;; `quotidian-corpus-files'.
 
 ;;; Code:
 
@@ -38,13 +42,23 @@
   :group 'applications
   :link '(url-link :tag "Homepage" "https://github.com/benthamite/quotidian"))
 
-(defcustom quotidian-corpus-files
-  (list (expand-file-name "data/quotidian-sample.json"
-                          (file-name-directory (or load-file-name buffer-file-name))))
+(defvar quotidian--bundled-corpus
+  (expand-file-name
+   "data/quotidian-sample.json"
+   (file-name-directory (or load-file-name buffer-file-name)))
+  "Absolute name of the corpus file shipped with the package.")
+
+(defcustom quotidian-corpus-files '(bundled)
   "Files holding quotations, read in order.
+An element is either the symbol `bundled', standing for the corpus file
+shipped with the package, or the name of a file.  The symbol is resolved
+when the corpus is read, so that customizing this option does not freeze
+the installation directory of one version of the package into your
+custom file.
+
 Each file is a JSON array of objects.  An object must have the keys
 \"text\" and \"author\", and may have \"source\", \"date\" and \"tags\"."
-  :type '(repeat file)
+  :type '(repeat (choice (const :tag "Bundled corpus" bundled) file))
   :group 'quotidian)
 
 (defcustom quotidian-echo-max-lines 4
@@ -75,10 +89,15 @@ and how many entries were dropped; details are logged, quietly, to
   (setq quotidian--corpus 'unset
         quotidian--skipped-files 0
         quotidian--dropped-entries 0)
-  (message "Quotidian: %d quotations, %d files skipped, %d entries dropped"
-           (length (quotidian--ensure-corpus))
-           quotidian--skipped-files
-           quotidian--dropped-entries))
+  (message "Quotidian: %s, %s skipped, %s dropped"
+           (quotidian--count (length (quotidian--ensure-corpus))
+                             "quotation" "quotations")
+           (quotidian--count quotidian--skipped-files "file" "files")
+           (quotidian--count quotidian--dropped-entries "entry" "entries")))
+
+(defun quotidian--count (number singular plural)
+  "Return NUMBER and the noun it counts: SINGULAR if it is one, else PLURAL."
+  (format "%d %s" number (if (= number 1) singular plural)))
 
 (defun quotidian--ensure-corpus ()
   "Return the quotations, reading them from disk on the first call."
@@ -87,8 +106,16 @@ and how many entries were dropped; details are logged, quietly, to
   quotidian--corpus)
 
 (defun quotidian--load ()
-  "Return the quotations in every file of `quotidian-corpus-files'."
-  (apply #'append (mapcar #'quotidian--read-file quotidian-corpus-files)))
+  "Return the quotations in every file of `quotidian-corpus-files'.
+The symbol `bundled' stands for the corpus file shipped with the
+package, and is resolved to its path here rather than in the option."
+  (apply #'append
+         (mapcar #'quotidian--read-file
+                 (mapcar #'quotidian--resolve-file quotidian-corpus-files))))
+
+(defun quotidian--resolve-file (file)
+  "Return FILE as a file name, resolving the symbol `bundled' to its path."
+  (if (eq file 'bundled) quotidian--bundled-corpus file))
 
 (defun quotidian--read-file (file)
   "Return the valid quotations in FILE.
@@ -149,7 +176,7 @@ Warn if any entry from FILE is dropped."
     valid))
 
 (defun quotidian--skip-shape (shape file)
-  "Warn that FILE holds SHAPE where an array was wanted, and return nil.
+  "Warn that SHAPE, not an array, is the shape of FILE, and return nil.
 The object case is named for what it is, because wrapping the array in
 an object is a likely first attempt and the entries are not at fault."
   (if (eq shape 'object)
@@ -279,8 +306,10 @@ not depend on the Emacs configuration it runs in."
           (fill-prefix (quotidian--factory-value 'fill-prefix))
           (left-margin (quotidian--factory-value 'left-margin))
           (adaptive-fill-mode (quotidian--factory-value 'adaptive-fill-mode))
-          (adaptive-fill-regexp (quotidian--factory-value 'adaptive-fill-regexp))
-          (adaptive-fill-function (quotidian--factory-value 'adaptive-fill-function)))
+          (adaptive-fill-regexp
+           (quotidian--factory-value 'adaptive-fill-regexp))
+          (adaptive-fill-function
+           (quotidian--factory-value 'adaptive-fill-function)))
       (fill-region (point-min) (point-max)))
     (buffer-string)))
 

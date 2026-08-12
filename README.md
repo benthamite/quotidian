@@ -1,11 +1,11 @@
 # `quotidian`: Display quotations from authoritative sources
 
-`quotidian` shows quotations from the Oxford Dictionary of Quotations and other authoritative sources. The corpus is a list of plain JSON files, read once per session, so you can extend it with anything you care to transcribe.
+`quotidian` shows quotations drawn from a corpus of your own choosing. The corpus is a list of plain JSON files, read once per session, so you can extend it with anything you care to transcribe. Twenty public-domain quotations are bundled to start you off.
 
 There are two ways to read them:
 
 - **In the echo area.** `quotidian-echo` puts a quotation where Emacs puts its own messages, and is meant to be called from a hook that fires when you are about to wait — a compilation, a package update, a long shell command. It never writes to `*Messages*`, never signals, and never truncates: a quotation too tall for the echo area is passed over in favour of another one, not shortened.
-- **In a review buffer.** `quotidian` opens a full-frame buffer with one quotation centred in it, wrapped for reading rather than stretched to the width of your frame. `n` and `SPC` move forward, `p` back through what you have already seen, `w` copies, and `q` leaves and puts your windows back as they were.
+- **In a review buffer.** `quotidian` opens a full-frame buffer with one quotation centred in it, wrapped for reading rather than stretched to the width of your frame. `n` and `SPC` move forward, `p` back through what you have already seen, `w` copies, `g` draws the current quotation again at the current width, and `q` leaves and puts your windows back as they were.
 
 Both entry points share one corpus, one formatter, and three faces, so a quotation looks the same wherever it appears.
 
@@ -50,9 +50,21 @@ The bundled corpus lives in the repository's `data` directory. Elpaca builds a p
 
 Run `M-x quotidian` to read quotations one at a time. To add your own, write a JSON array of objects with `text` and `author` — and optionally `source`, `date`, and `tags` — add the file to `quotidian-corpus-files`, and run `M-x quotidian-reload`, which reports how many quotations it loaded and how many entries it had to drop.
 
+The array must be the whole file. A file that wraps it in an object, as `{"quotes": [...]}` does, is skipped whole rather than read entry by entry.
+
+The default value of `quotidian-corpus-files` is `(bundled)`, the symbol standing for the corpus that ships with the package. Keep it in the list to go on reading the bundled quotations alongside your own; drop it to read only your own.
+
 ## Documentation
 
 For a comprehensive description of the corpus format, all user options, commands, and faces, see the [manual](README.org).
+
+## Tests
+
+From the root of a clone, with nothing installed but Emacs:
+
+```shell
+emacs -Q --batch -L . -l test/quotidian-test.el -f ert-run-tests-batch-and-exit
+```
 
 ## License
 

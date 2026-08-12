@@ -52,7 +52,8 @@ state into each other."
       (should (null (plist-get second :date))))))
 
 (ert-deftest quotidian-test-missing-file-is-skipped ()
-  (quotidian-test-with-corpus (list (quotidian-test-fixture "does-not-exist.json"))
+  (quotidian-test-with-corpus
+      (list (quotidian-test-fixture "does-not-exist.json"))
     (should (null (quotidian--ensure-corpus)))))
 
 (ert-deftest quotidian-test-malformed-file-is-skipped ()
@@ -84,15 +85,38 @@ state into each other."
       (should (= quotidian--dropped-entries 0)))))
 
 (ert-deftest quotidian-test-invalid-entries-are-dropped ()
-  (quotidian-test-with-corpus (list (quotidian-test-fixture "invalid-entries.json"))
+  (quotidian-test-with-corpus
+      (list (quotidian-test-fixture "invalid-entries.json"))
     (let ((corpus (quotidian--ensure-corpus)))
       (should (= (length corpus) 1))
       (should (equal (plist-get (car corpus) :author) "Valid Author")))))
 
 (ert-deftest quotidian-test-files-are-concatenated ()
-  (quotidian-test-with-corpus (list (quotidian-test-fixture "valid.json")
-                                    (quotidian-test-fixture "invalid-entries.json"))
+  (quotidian-test-with-corpus
+      (list (quotidian-test-fixture "valid.json")
+            (quotidian-test-fixture "invalid-entries.json"))
     (should (= (length (quotidian--ensure-corpus)) 3))))
+
+(ert-deftest quotidian-test-corpus-files-default-holds-no-path ()
+  "Check that the option's default is the `bundled' symbol, not a path.
+A path here would be written to the user's custom file on the first
+customization and would point at the old install after an upgrade."
+  (should (equal (eval (car (get 'quotidian-corpus-files 'standard-value)) t)
+                 '(bundled))))
+
+(ert-deftest quotidian-test-bundled-corpus-loads-cleanly ()
+  "Check that the corpus file that ships with the package is read whole."
+  (quotidian-test-with-corpus '(bundled)
+    (let ((quotidian--skipped-files 0)
+          (quotidian--dropped-entries 0))
+      (should (= (length (quotidian--ensure-corpus)) 20))
+      (should (= quotidian--skipped-files 0))
+      (should (= quotidian--dropped-entries 0)))))
+
+(ert-deftest quotidian-test-bundled-symbol-mixes-with-file-names ()
+  (quotidian-test-with-corpus
+      (list 'bundled (quotidian-test-fixture "valid.json"))
+    (should (= (length (quotidian--ensure-corpus)) 22))))
 
 (ert-deftest quotidian-test-corpus-is-cached ()
   (quotidian-test-with-corpus (list (quotidian-test-fixture "valid.json"))
@@ -121,12 +145,14 @@ state into each other."
 
 (ert-deftest quotidian-test-format-without-source ()
   (should (equal (substring-no-properties
-                  (quotidian-format '(:text "Text." :author "Author" :date "1900")))
+                  (quotidian-format
+                   '(:text "Text." :author "Author" :date "1900")))
                  "Text.\n— Author, 1900")))
 
 (ert-deftest quotidian-test-format-without-date ()
   (should (equal (substring-no-properties
-                  (quotidian-format '(:text "Text." :author "Author" :source "Source")))
+                  (quotidian-format
+                   '(:text "Text." :author "Author" :source "Source")))
                  "Text.\n— Author\n  Source")))
 
 (ert-deftest quotidian-test-format-with-author-only ()
@@ -182,7 +208,8 @@ state into each other."
                               "[{\"text\": \"Short.\", \"author\": \"A\"}]")))
     (unwind-protect
         (quotidian-test-with-corpus (list file)
-          (should (equal (substring-no-properties (quotidian--select-fitting 4 40))
+          (should (equal (substring-no-properties
+                          (quotidian--select-fitting 4 40))
                          "Short.\n— A")))
       (delete-file file))))
 
@@ -224,8 +251,9 @@ state into each other."
       (delete-file file))))
 
 (ert-deftest quotidian-test-echo-does-not-log ()
-  (let ((file (make-temp-file "quotidian-test" nil ".json"
-                              "[{\"text\": \"Unlogged.\", \"author\": \"A\"}]")))
+  (let ((file (make-temp-file
+               "quotidian-test" nil ".json"
+               "[{\"text\": \"Unlogged.\", \"author\": \"A\"}]")))
     (unwind-protect
         (quotidian-test-with-corpus (list file)
           (let ((before (with-current-buffer (get-buffer-create "*Messages*")
@@ -278,8 +306,26 @@ state into each other."
                  (lambda (format &rest args)
                    (setq captured (apply #'format format args)))))
         (quotidian-reload)))
-    (should (string-match-p "1 files skipped" captured))
-    (should (string-match-p "3 entries dropped" captured))))
+    (should (string-match-p "1 file skipped" captured))
+    (should (string-match-p "4 entries dropped" captured))))
+
+(ert-deftest quotidian-test-reload-counts-of-one-are-singular ()
+  (let* (captured
+         (file (make-temp-file
+                "quotidian-test" nil ".json"
+                (concat "[{\"text\": \"One.\", \"author\": \"A\"},"
+                        " {\"text\": \"\", \"author\": \"B\"}]")))
+         (files (list (quotidian-test-fixture "does-not-exist.json") file)))
+    (unwind-protect
+        (quotidian-test-with-corpus files
+          (cl-letf (((symbol-function 'message)
+                     (lambda (format &rest args)
+                       (setq captured (apply #'format format args)))))
+            (quotidian-reload)))
+      (delete-file file))
+    (should (equal captured
+                   (concat "Quotidian: 1 quotation, 1 file skipped,"
+                           " 1 entry dropped")))))
 
 (ert-deftest quotidian-test-echo-max-lines-clamped-by-resize-mini-windows ()
   (let ((resize-mini-windows nil)
@@ -293,12 +339,33 @@ state into each other."
     (cl-letf (((symbol-function 'frame-height) (lambda (&rest _) 20)))
       (should (= (quotidian--echo-max-lines) 4)))))
 
+(ert-deftest quotidian-test-echo-max-lines-with-integer-mini-window-height ()
+  (let ((resize-mini-windows t)
+        (max-mini-window-height 3)
+        (quotidian-echo-max-lines 10))
+    (should (= (quotidian--echo-max-lines) 3))))
+
 (ert-deftest quotidian-test-warn-logs-without-popping ()
-  (when (get-buffer "*Warnings*") (kill-buffer "*Warnings*"))
-  (quotidian--warn "Probe message for warn logging test")
-  (should (get-buffer "*Warnings*"))
-  (should (string-match-p "Probe message for warn logging test"
-                          (with-current-buffer "*Warnings*" (buffer-string)))))
+  "Check that `quotidian--warn' writes to `*Warnings*' but shows no window.
+The buffer belongs to the user, so it is left as it was found: created
+here is killed here, and pre-existing contents are put back."
+  (let* ((existing (get-buffer "*Warnings*"))
+         (before (and existing
+                      (with-current-buffer existing (buffer-string)))))
+    (unwind-protect
+        (progn
+          (quotidian--warn "Probe message for warn logging test")
+          (should (get-buffer "*Warnings*"))
+          (should (string-match-p
+                   "Probe message for warn logging test"
+                   (with-current-buffer "*Warnings*" (buffer-string))))
+          (should-not (get-buffer-window "*Warnings*" t)))
+      (if existing
+          (with-current-buffer existing
+            (let ((inhibit-read-only t))
+              (erase-buffer)
+              (insert before)))
+        (when (get-buffer "*Warnings*") (kill-buffer "*Warnings*"))))))
 
 (require 'quotidian-review)
 
@@ -307,8 +374,9 @@ state into each other."
 The buffer is killed afterwards.  A single-quotation corpus makes
 selection deterministic, so the tests need no control over randomness."
   (declare (indent 1))
-  `(let ((file (make-temp-file "quotidian-test" nil ".json"
-                               (format "[{\"text\": %S, \"author\": \"A\"}]" ,text))))
+  `(let ((file (make-temp-file
+                "quotidian-test" nil ".json"
+                (format "[{\"text\": %S, \"author\": \"A\"}]" ,text))))
      (unwind-protect
          (quotidian-test-with-corpus (list file)
            (save-window-excursion
@@ -386,6 +454,28 @@ selection deterministic, so the tests need no control over randomness."
               (kill-buffer "*quotidian*")
               (should (equal (quotidian-test-window-buffers) before)))))
       (delete-file file))))
+
+(ert-deftest quotidian-test-review-killing-hidden-buffer-keeps-layout ()
+  "Check that killing an off-screen review buffer leaves the windows alone.
+The layout to restore is the one the review replaced, which is not the
+one the user is in by the time he kills the buffer from elsewhere."
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"Hidden.\", \"author\": \"A\"}]"))
+        (first (get-buffer-create "*quotidian-test-first*"))
+        (second (get-buffer-create "*quotidian-test-second*")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (save-window-excursion
+            (delete-other-windows)
+            (quotidian)
+            (switch-to-buffer first)
+            (set-window-buffer (split-window) second)
+            (let ((before (quotidian-test-window-buffers)))
+              (kill-buffer "*quotidian*")
+              (should (equal (quotidian-test-window-buffers) before)))))
+      (delete-file file)
+      (kill-buffer first)
+      (kill-buffer second))))
 
 (ert-deftest quotidian-test-review-next-signals-on-empty-corpus ()
   (let ((file (make-temp-file "quotidian-test" nil ".json"
@@ -491,6 +581,39 @@ deterministic."
       (should (= quotidian-review--index 1))
       (should (equal (plist-get (quotidian-review--current) :text) "Two."))
       (should (eq quotidian-review--window-configuration configuration)))))
+
+(ert-deftest quotidian-test-review-mode-line-lists-the-keys ()
+  "Check the mode-line hint against the keys the review buffer answers to.
+The mode line is the only place a user reads them, so a key added
+without a hint is a key nobody finds.  `SPC' is left out of the hint on
+purpose: it is an alias for `n', and `special-mode' gives it a scrolling
+meaning elsewhere."
+  (quotidian-test-with-scripted-review '("One.")
+    (should (equal (substring-no-properties mode-line-format)
+                   " n next   p previous   w copy   g redraw   q quit"))
+    (dolist (binding '(("n" . quotidian-review-next)
+                       ("SPC" . quotidian-review-next)
+                       ("p" . quotidian-review-previous)
+                       ("w" . quotidian-review-copy)
+                       ("g" . revert-buffer)
+                       ("q" . quotidian-review-quit)))
+      (should (eq (key-binding (kbd (car binding))) (cdr binding))))))
+
+(defun quotidian-test-review-lines ()
+  "Return the non-blank lines of the review buffer, without their centring."
+  (seq-remove #'string-empty-p
+              (mapcar #'string-trim (split-string (buffer-string) "\n"))))
+
+(ert-deftest quotidian-test-review-fill-column-sets-the-width ()
+  (quotidian-test-with-scripted-review '("one two three four five")
+    (let ((quotidian-review-fill-column 9))
+      (quotidian-review--render)
+      (should (equal (quotidian-test-review-lines)
+                     '("one two" "three" "four five" "— A"))))
+    (let ((quotidian-review-fill-column 40))
+      (quotidian-review--render)
+      (should (equal (quotidian-test-review-lines)
+                     '("one two three four five" "— A"))))))
 
 (ert-deftest quotidian-test-review-render-defaults-to-selected-window ()
   (quotidian-test-with-review "Selected."

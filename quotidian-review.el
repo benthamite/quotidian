@@ -1,11 +1,13 @@
 ;;; quotidian-review.el --- Review buffer for quotidian -*- lexical-binding: t -*-
 
-;; Copyright (C) 2026
+;; Copyright (C) 2026 Pablo Stafforini
 
-;; Author: Pablo Stafforini
+;; Author: Pablo Stafforini <pablo@stafforini.com>
+;; Maintainer: Pablo Stafforini <pablo@stafforini.com>
 ;; URL: https://github.com/benthamite/quotidian
 ;; Version: 0.1
 ;; Package-Requires: ((emacs "29.1"))
+;; Keywords: convenience
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -24,7 +26,8 @@
 
 ;;; Commentary:
 
-;; A buffer for reading quotations one at a time.
+;; A buffer for reading quotations one at a time, one to a screen.  The
+;; quotations are the ones `quotidian' reads from its corpus files.
 
 ;;; Code:
 
@@ -32,7 +35,7 @@
 
 (defcustom quotidian-review-fill-column 64
   "Width, in columns, at which quotations are wrapped in the review buffer."
-  :type 'integer
+  :type 'natnum
   :group 'quotidian)
 
 (defvar-keymap quotidian-review-mode-map
@@ -57,7 +60,7 @@
   "Read quotations one at a time, one to a screen."
   (interactive)
   (unless (quotidian--ensure-corpus)
-    (user-error "No quotations found; check `quotidian-corpus-files'"))
+    (quotidian-review--no-quotations))
   (let ((configuration (current-window-configuration)))
     (switch-to-buffer (get-buffer-create "*quotidian*"))
     (unless (derived-mode-p 'quotidian-review-mode)
@@ -72,7 +75,7 @@
   (setq-local cursor-type nil)
   (setq-local revert-buffer-function #'quotidian-review--revert)
   (setq-local mode-line-format
-              (propertize " n next   p previous   w copy   q quit"
+              (propertize " n next   p previous   w copy   g redraw   q quit"
                           'face 'shadow))
   (add-hook 'window-size-change-functions #'quotidian-review--resize nil t)
   (add-hook 'kill-buffer-hook #'quotidian-review--restore-windows nil t))
@@ -122,8 +125,14 @@ without the attribution."
 (defun quotidian-review--draw ()
   "Return a quotation chosen at random.
 Signal `user-error' if the corpus is empty."
-  (or (quotidian--select)
-      (user-error "No quotations found; check `quotidian-corpus-files'")))
+  (or (quotidian--select) (quotidian-review--no-quotations)))
+
+(defun quotidian-review--no-quotations ()
+  "Signal a `user-error' reporting that the corpus is empty.
+The check is made both before the review buffer is shown and before
+each draw, so that an empty corpus never leaves an empty buffer on
+screen."
+  (user-error "No quotations found; check `quotidian-corpus-files'"))
 
 (defun quotidian-review--push (quote)
   "Add QUOTE to the end of the history and make it the current one."
@@ -162,8 +171,12 @@ WINDOW defaults to the selected window."
           line))
 
 (defun quotidian-review--restore-windows ()
-  "Restore the window configuration saved when the review began."
-  (when quotidian-review--window-configuration
+  "Restore the window configuration saved when the review began.
+Do nothing unless the buffer being killed is on screen: killing a review
+buffer that is not displayed, from the buffer list or from a cleanup
+command, would otherwise throw away the layout the user is working in."
+  (when (and quotidian-review--window-configuration
+             (get-buffer-window (current-buffer)))
     (set-window-configuration quotidian-review--window-configuration)))
 
 (defun quotidian-review--resize (window)

@@ -18,7 +18,7 @@ This manual describes the features and customization options for the Emacs Lisp 
 :CUSTOM_ID: h:overview
 :END:
 
-=quotidian.el= shows quotations from the Oxford Dictionary of Quotations and other authoritative sources.  Quotations live in plain JSON files, so the corpus is yours to extend, and the package reads them once per Emacs session and keeps them in memory.
+=quotidian.el= shows quotations drawn from a corpus of your own choosing.  Quotations live in plain JSON files, so the corpus is yours to extend, and the package reads them once per Emacs session and keeps them in memory.  A small corpus of public-domain quotations is bundled with the package ([[#h:copyright][Quotations and copyright]]).
 
 There are two ways to read them:
 
@@ -50,7 +50,7 @@ A dictionary of quotations that is still under copyright cannot be redistributed
 :CUSTOM_ID: h:data-directory
 :END:
 
-The bundled corpus lives in the =data= subdirectory of the repository, and ~quotidian-corpus-files~ points at it relative to the file the package was loaded from ([[#h:corpus-files-option][The corpus files]]).
+The bundled corpus lives in the =data= subdirectory of the repository, and the default value of ~quotidian-corpus-files~ names it through the symbol ~bundled~, which is resolved relative to the file the package was loaded from ([[#h:corpus-files-option][The corpus files]]).
 
 Elpaca does not copy that directory into the build directory it loads the package from.  Like several package managers, it builds a package from the files its recipe names, and the default set is Lisp files and documentation and nothing else.  The consequence is not subtle: the default corpus path resolves to a file that is not there, and the package finds no quotations at all.  ~quotidian~ signals =No quotations found; check `quotidian-corpus-files'=, and ~quotidian-echo~ shows nothing, on an installation that is otherwise perfectly healthy.
 
@@ -184,7 +184,9 @@ All user options belong to the ~quotidian~ customization group.  You can browse 
 
 #+vindex: quotidian-corpus-files
 
-The user option ~quotidian-corpus-files~ is the list of files holding quotations, read in order.  Its default value is a one-element list holding the path of the bundled corpus, =data/quotidian-sample.json=, resolved relative to the directory the package was loaded from ([[#h:data-directory][The data directory is part of the package]]).
+The user option ~quotidian-corpus-files~ is the list of files holding quotations, read in order.  An element is either the name of a file or the symbol ~bundled~, which stands for the corpus file shipped with the package, =data/quotidian-sample.json= ([[#h:data-directory][The data directory is part of the package]]).  The default value is the one-element list ~(bundled)~.
+
+The symbol is there so that the default holds no absolute path.  A path would be written to your custom file the first time you customized the option, and under a package manager that puts the version number in the installation directory — =package.el= does — the next upgrade would leave it pointing at a directory that no longer exists, and the bundled quotations would quietly disappear.  The symbol is resolved afresh every time the corpus is read.
 
 Add your own files to the list to read more than the bundled twenty:
 
@@ -192,7 +194,7 @@ Add your own files to the list to read more than the bundled twenty:
 (add-to-list 'quotidian-corpus-files "~/quotations/oxford.json" t)
 #+end_src
 
-Every file is read and the quotations are pooled; a quotation is then chosen from the pool at random, so a file ten times the size of another contributes ten times as often.  The draw is with replacement, and the package keeps no record of what you have already been shown, so the same quotation can come up twice in a row; on a small corpus it will, often.  Removing the bundled file from the list leaves only your own.  Changing the option takes effect after ~quotidian-reload~ ([[#h:warnings-and-reloading][Warnings and reloading]]).
+Every file is read and the quotations are pooled; a quotation is then chosen from the pool at random, so a file ten times the size of another contributes ten times as often.  The draw is with replacement, and the package keeps no record of what you have already been shown, so the same quotation can come up twice in a row; on a small corpus it will, often.  Removing ~bundled~ from the list leaves only your own.  Changing the option takes effect after ~quotidian-reload~ ([[#h:warnings-and-reloading][Warnings and reloading]]).
 
 ** The height of the echo area
 :PROPERTIES:
@@ -214,7 +216,7 @@ Emacs will not necessarily give you the height you ask for.  The echo area canno
 
 #+vindex: quotidian-review-fill-column
 
-The user option ~quotidian-review-fill-column~ is the width, in columns, at which quotations are wrapped in the review buffer.  The value is an integer and the default is =64=.
+The user option ~quotidian-review-fill-column~ is the width, in columns, at which quotations are wrapped in the review buffer.  The value is a non-negative integer and the default is =64=.
 
 This is a measure of line length for reading, not a use of the frame's width: the wrapped block is centred in the window, so a wide frame gives wide margins rather than long lines.  The option is defined in =quotidian-review.el= and has no effect on ~quotidian-echo~, which wraps to the width of the echo area instead.
 
@@ -313,7 +315,7 @@ The command ~quotidian-review-previous~ steps back one quotation.  At the oldest
 
 The command ~quotidian-review-copy~ copies the current quotation and its attribution to the kill ring, without text properties.  What you get is the quotation as ~quotidian-format~ builds it ([[#h:formatting][Formatting a quotation]]) — neither wrapped nor centred, unlike the buffer you are looking at — so that it lands in whatever you paste it into at that text's own width.  With a prefix argument (=C-u w=) it copies the text of the quotation alone, which is what you want when you are quoting inside your own sentence.  It reports =Copied= either way.
 
-The command ~quotidian-review-quit~ kills the review buffer and puts the windows back as they were before the review began.  The layout is restored by a ~kill-buffer-hook~, so it is restored equally when you kill the buffer some other way — =C-x k=, ~kill-some-buffers~, or a session cleanup.  The command refuses, with a ~user-error~, if it is somehow called outside a review buffer.
+The command ~quotidian-review-quit~ kills the review buffer and puts the windows back as they were before the review began.  The layout is restored by a ~kill-buffer-hook~, so it is restored equally when you kill the buffer some other way — =C-x k=, ~kill-some-buffers~, or a session cleanup — as long as the buffer is on screen at the time.  Killing a review buffer that is not displayed, from the buffer list say, leaves your windows alone: the layout the buffer remembers is the one the review replaced, and by then you are working in a later one.  The command refuses, with a ~user-error~, if it is somehow called outside a review buffer.
 
 ** Reloading the corpus
 :PROPERTIES:
@@ -345,6 +347,19 @@ The unexamined life is not worth living.
 #+end_example
 
 The string is unwrapped: the caller decides the width.  This is the function to call if you want to show a quotation somewhere the package does not, such as a dashboard or a scratch buffer, and it is what ~quotidian-review-copy~ copies ([[#h:key-bindings][Key bindings]]).
+
+* Running the tests
+:PROPERTIES:
+:CUSTOM_ID: h:tests
+:END:
+
+The tests are an ERT suite in =test/quotidian-test.el=, with its fixtures in =test/fixtures/=.  Run it from the root of a clone:
+
+#+begin_src shell
+emacs -Q --batch -L . -l test/quotidian-test.el -f ert-run-tests-batch-and-exit
+#+end_src
+
+Nothing is needed beyond Emacs itself: ERT is bundled, no test runs over the network, and =-Q= keeps your configuration out of the result.  The command prints one line per test and exits with a non-zero status if any of them fails.
 
 * Indices
 :PROPERTIES:
