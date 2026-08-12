@@ -114,13 +114,26 @@ state into each other."
                  "short\nalso short")))
 
 (ert-deftest quotidian-test-fill-does-not-split-words ()
-  (should (seq-every-p (lambda (line) (<= (length line) 10))
-                       (split-string (quotidian--fill "aaa bbb ccc ddd eee" 10) "\n"))))
+  (should (equal (split-string (quotidian--fill "aaa bbb ccc ddd eee" 10))
+                 (list "aaa" "bbb" "ccc" "ddd" "eee"))))
+
+(ert-deftest quotidian-test-fill-keeps-source-indented-and-faced ()
+  (let* ((formatted (quotidian-format
+                      '(:text "Short." :author "Author"
+                        :source "A Long Source Title That Wraps Around")))
+         (filled (quotidian--fill formatted 20)))
+    (should (equal (split-string filled "\n")
+                   (list "Short." "— Author" "  A Long Source"
+                         "  Title That Wraps" "  Around")))
+    (should (seq-every-p (lambda (line) (eq (get-text-property 0 'face line)
+                                            'quotidian-source))
+                         (last (split-string filled "\n") 3)))))
 
 (ert-deftest quotidian-test-line-count ()
-  (should (= (quotidian--line-count "one") 1))
-  (should (= (quotidian--line-count "one\ntwo") 2))
-  (should (= (quotidian--line-count "one\ntwo\nthree") 3)))
+  (should (= (quotidian--line-count "one" 40) 1))
+  (should (= (quotidian--line-count "one\ntwo" 40) 2))
+  (should (= (quotidian--line-count "one\ntwo\nthree" 40) 3))
+  (should (= (quotidian--line-count (make-string 50 ?a) 20) 3)))
 
 (ert-deftest quotidian-test-select-returns-corpus-member ()
   (quotidian-test-with-corpus (list (quotidian-test-fixture "valid.json"))
@@ -139,17 +152,9 @@ state into each other."
                          "Short.\n— A")))
       (delete-file file))))
 
-(ert-deftest quotidian-test-fill-keeps-source-indented-and-faced ()
-  (let* ((formatted (quotidian-format
-                      '(:text "Short." :author "Author"
-                        :source "A Long Source Title That Wraps Around")))
-         (filled (quotidian--fill formatted 20))
-         (lines (split-string filled "\n")))
-    (should (seq-every-p (lambda (line) (string-prefix-p "  " line))
-                         (last lines 3)))
-    (should (seq-every-p (lambda (line) (eq (get-text-property 0 'face line)
-                                            'quotidian-source))
-                         (last lines 3)))))
+(ert-deftest quotidian-test-select-fitting-on-empty-corpus ()
+  (quotidian-test-with-corpus nil
+    (should (null (quotidian--select-fitting 4 40)))))
 
 (ert-deftest quotidian-test-select-fitting-rejects-long-quotes ()
   (let ((file (make-temp-file

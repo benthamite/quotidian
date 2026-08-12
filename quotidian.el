@@ -153,11 +153,6 @@ source, if there is one, occupies a second indented line."
 (defconst quotidian--echo-attempts 20
   "How many quotations `quotidian-echo' tries before it gives up.")
 
-(defun quotidian--select ()
-  "Return a quotation chosen at random, or nil if the corpus is empty."
-  (when-let* ((corpus (quotidian--ensure-corpus)))
-    (seq-random-elt corpus)))
-
 (defun quotidian--select-fitting (max-lines width)
   "Return a formatted quotation of at most MAX-LINES lines, filled at WIDTH.
 Return nil if `quotidian--echo-attempts' random draws all give a longer
@@ -167,8 +162,13 @@ string, not the quotation itself."
            for quote = (quotidian--select)
            while quote
            for filled = (quotidian--fill (quotidian-format quote) width)
-           when (<= (quotidian--line-count filled) max-lines)
+           when (<= (quotidian--line-count filled width) max-lines)
            return filled))
+
+(defun quotidian--select ()
+  "Return a quotation chosen at random, or nil if the corpus is empty."
+  (when-let* ((corpus (quotidian--ensure-corpus)))
+    (seq-random-elt corpus)))
 
 (defun quotidian--fill (string width)
   "Return STRING with every line word-wrapped to WIDTH columns.
@@ -179,16 +179,30 @@ survive."
              "\n"))
 
 (defun quotidian--fill-line (line width)
-  "Return LINE word-wrapped to WIDTH columns."
+  "Return LINE word-wrapped to WIDTH columns.
+Filling ignores the user's customized fill variables, so the result does
+not depend on the Emacs configuration it runs in."
   (with-temp-buffer
     (insert line)
-    (let ((fill-column width))
+    (let ((fill-column width)
+          (fill-prefix (quotidian--factory-value 'fill-prefix))
+          (left-margin (quotidian--factory-value 'left-margin))
+          (adaptive-fill-mode (quotidian--factory-value 'adaptive-fill-mode))
+          (adaptive-fill-regexp (quotidian--factory-value 'adaptive-fill-regexp))
+          (adaptive-fill-function (quotidian--factory-value 'adaptive-fill-function)))
       (fill-region (point-min) (point-max)))
     (buffer-string)))
 
-(defun quotidian--line-count (string)
-  "Return the number of lines in STRING."
-  (1+ (cl-count ?\n string)))
+(defun quotidian--factory-value (symbol)
+  "Return the factory-default value of the customizable variable SYMBOL."
+  (eval (car (get symbol 'standard-value))))
+
+(defun quotidian--line-count (string width)
+  "Return the number of display lines STRING occupies at WIDTH columns.
+A line of STRING wider than WIDTH counts as more than one line, the way
+`message' wraps it in the echo area."
+  (cl-loop for line in (split-string string "\n")
+           sum (max 1 (ceiling (string-width line) width))))
 
 (provide 'quotidian)
 ;;; quotidian.el ends here
