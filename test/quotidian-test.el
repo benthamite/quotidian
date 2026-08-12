@@ -386,7 +386,8 @@ TEXTS is a list of strings.  `quotidian--select' is replaced so that
 successive draws walk through TEXTS, which makes the order of quotations
 deterministic."
   (declare (indent 1))
-  `(let* ((remaining (mapcar (lambda (text) (list :text text :author "A")) ,texts))
+  `(let* ((remaining (mapcar (lambda (text) (list :text text :author "A"))
+                             ,texts))
           (quotidian--corpus (copy-sequence remaining)))
      (cl-letf (((symbol-function 'quotidian--select)
                 (lambda () (pop remaining))))
