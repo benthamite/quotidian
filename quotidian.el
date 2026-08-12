@@ -45,18 +45,22 @@ Each file is a JSON array of objects.  An object must have the keys
   :type '(repeat file)
   :group 'quotidian)
 
-(defvar quotidian--corpus nil
-  "Parsed quotations, or nil if they have not been read yet.")
+(defvar quotidian--corpus 'unset
+  "Parsed quotations, or `unset' if they have not been read yet.
+The sentinel distinguishes a corpus that has not been read from one that
+was read and turned out to be empty.")
 
 (defun quotidian-reload ()
   "Read the corpus files again, discarding the cached quotations."
   (interactive)
-  (setq quotidian--corpus nil)
+  (setq quotidian--corpus 'unset)
   (message "Quotidian: %d quotations" (length (quotidian--ensure-corpus))))
 
 (defun quotidian--ensure-corpus ()
   "Return the quotations, reading them from disk on the first call."
-  (or quotidian--corpus (setq quotidian--corpus (quotidian--load))))
+  (when (eq quotidian--corpus 'unset)
+    (setq quotidian--corpus (quotidian--load)))
+  quotidian--corpus)
 
 (defun quotidian--load ()
   "Return the quotations in every file of `quotidian-corpus-files'."
@@ -72,6 +76,9 @@ JSON."
         (quotidian--validate (quotidian--parse file) file)
       (json-parse-error
        (quotidian--warn "Corpus file is not valid JSON, skipping it: %s (%s)"
+                        file (error-message-string error)))
+      (file-error
+       (quotidian--warn "Corpus file could not be read, skipping it: %s (%s)"
                         file (error-message-string error))))))
 
 (defun quotidian--parse (file)
@@ -100,7 +107,7 @@ Warn if any entry from FILE is dropped."
 
 (defun quotidian--non-empty-p (value)
   "Return non-nil if VALUE is a string with at least one character."
-  (and (stringp value) (not (string-empty-p value))))
+  (and (stringp value) (not (string= value ""))))
 
 (defun quotidian--warn (format &rest args)
   "Warn with FORMAT and ARGS, and return nil.

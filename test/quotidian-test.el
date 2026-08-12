@@ -23,7 +23,7 @@ The corpus cache is cleared before and after, so tests do not leak
 state into each other."
   (declare (indent 1))
   `(let ((quotidian-corpus-files ,files)
-         (quotidian--corpus nil))
+         (quotidian--corpus 'unset))
      ,@body))
 
 (ert-deftest quotidian-test-reads-valid-file ()
