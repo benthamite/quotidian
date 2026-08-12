@@ -41,6 +41,25 @@ limit is smaller, so a quotation it chooses to show is never cut off —
 though on a short frame, or with ~resize-mini-windows~ set to nil, that
 may mean fewer lines than ~quotidian-echo-max-lines~ asks for.
 
+** Review buffer
+
+Call ~quotidian~ to read quotations one at a time, in a full-frame buffer:
+the current quotation is centred both horizontally and vertically, wrapped
+at ~quotidian-review-fill-column~ (default 64) columns. Key hints appear
+on the mode line rather than in the buffer text.
+
+| Key   | Action                                        |
+|-------+------------------------------------------------|
+| ~n~   | Show the next quotation                       |
+| ~p~   | Show the quotation seen before this one       |
+| ~w~   | Copy the quotation and its attribution        |
+| ~q~   | Quit, restoring the previous window layout    |
+
+A prefix argument to ~w~ copies the text of the quotation without its
+attribution. Quotations already seen are kept in a per-buffer history, so
+~n~ and ~p~ step back and forth through them without redrawing at random;
+~n~ only draws a new quotation once the end of the history is reached.
+
 * Corpus files
 
 Each corpus file is a JSON array of objects, one per quotation:

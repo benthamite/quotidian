@@ -276,5 +276,53 @@ state into each other."
   (should (string-match-p "Probe message for warn logging test"
                           (with-current-buffer "*Warnings*" (buffer-string)))))
 
+(require 'quotidian-review)
+
+(defmacro quotidian-test-with-review (text &rest body)
+  "Open a review buffer on a one-quotation corpus of TEXT and run BODY.
+The buffer is killed afterwards.  A single-quotation corpus makes
+selection deterministic, so the tests need no control over randomness."
+  (declare (indent 1))
+  `(let ((file (make-temp-file "quotidian-test" nil ".json"
+                               (format "[{\"text\": %S, \"author\": \"A\"}]" ,text))))
+     (unwind-protect
+         (quotidian-test-with-corpus (list file)
+           (save-window-excursion
+             (quotidian)
+             (unwind-protect (progn ,@body)
+               (kill-buffer "*quotidian*"))))
+       (delete-file file))))
+
+(ert-deftest quotidian-test-review-shows-the-quotation ()
+  (quotidian-test-with-review "Displayed."
+    (should (string-match-p "Displayed\\." (buffer-string)))
+    (should (string-match-p "— A" (buffer-string)))))
+
+(ert-deftest quotidian-test-review-buffer-is-read-only ()
+  (quotidian-test-with-review "Read only."
+    (should buffer-read-only)
+    (should (eq major-mode 'quotidian-review-mode))))
+
+(ert-deftest quotidian-test-review-centres-the-text ()
+  (quotidian-test-with-review "Centred."
+    (goto-char (point-min))
+    (should (re-search-forward "^ +Centred\\." nil t))))
+
+(ert-deftest quotidian-test-review-signals-on-empty-corpus ()
+  (quotidian-test-with-corpus nil
+    (should-error (quotidian) :type 'user-error)))
+
+(ert-deftest quotidian-test-review-quit-restores-windows ()
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"Quit.\", \"author\": \"A\"}]")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (let ((before (current-buffer)))
+            (quotidian)
+            (quotidian-review-quit)
+            (should (eq (current-buffer) before))
+            (should (null (get-buffer "*quotidian*")))))
+      (delete-file file))))
+
 (provide 'quotidian-test)
 ;;; quotidian-test.el ends here
