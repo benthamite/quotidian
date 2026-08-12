@@ -380,5 +380,93 @@ selection deterministic, so the tests need no control over randomness."
               (kill-buffer "*quotidian*"))))
       (delete-file file))))
 
+(defmacro quotidian-test-with-scripted-review (texts &rest body)
+  "Open a review buffer whose draws return TEXTS in order, then run BODY.
+TEXTS is a list of strings.  `quotidian--select' is replaced so that
+successive draws walk through TEXTS, which makes the order of quotations
+deterministic."
+  (declare (indent 1))
+  `(let* ((remaining (mapcar (lambda (text) (list :text text :author "A")) ,texts))
+          (quotidian--corpus (copy-sequence remaining)))
+     (cl-letf (((symbol-function 'quotidian--select)
+                (lambda () (pop remaining))))
+       (save-window-excursion
+         (quotidian)
+         (unwind-protect (progn ,@body)
+           (kill-buffer "*quotidian*"))))))
+
+(ert-deftest quotidian-test-review-next-draws-a-new-quotation ()
+  (quotidian-test-with-scripted-review '("One." "Two.")
+    (should (string-match-p "One\\." (buffer-string)))
+    (quotidian-review-next)
+    (should (string-match-p "Two\\." (buffer-string)))))
+
+(ert-deftest quotidian-test-review-previous-steps-back ()
+  (quotidian-test-with-scripted-review '("One." "Two.")
+    (quotidian-review-next)
+    (quotidian-review-previous)
+    (should (string-match-p "One\\." (buffer-string)))))
+
+(ert-deftest quotidian-test-review-next-after-previous-uses-history ()
+  (quotidian-test-with-scripted-review '("One." "Two.")
+    (quotidian-review-next)
+    (quotidian-review-previous)
+    (quotidian-review-next)
+    (should (string-match-p "Two\\." (buffer-string)))
+    (should (= (length quotidian-review--history) 2))))
+
+(ert-deftest quotidian-test-review-previous-at-start-does-nothing ()
+  (quotidian-test-with-scripted-review '("One.")
+    (quotidian-review-previous)
+    (should (string-match-p "One\\." (buffer-string)))
+    (should (zerop quotidian-review--index))))
+
+(ert-deftest quotidian-test-review-copy-includes-attribution ()
+  (let ((kill-ring nil) (kill-ring-yank-pointer nil))
+    (quotidian-test-with-scripted-review '("Copied.")
+      (quotidian-review-copy)
+      (should (equal (current-kill 0) "Copied.\n— A")))))
+
+(ert-deftest quotidian-test-review-copy-text-only ()
+  (let ((kill-ring nil) (kill-ring-yank-pointer nil))
+    (quotidian-test-with-scripted-review '("Copied.")
+      (quotidian-review-copy t)
+      (should (equal (current-kill 0) "Copied.")))))
+
+(ert-deftest quotidian-test-review-copy-has-no-text-properties ()
+  (let ((kill-ring nil) (kill-ring-yank-pointer nil))
+    (quotidian-test-with-scripted-review '("Copied.")
+      (quotidian-review-copy)
+      (should (null (text-properties-at 0 (current-kill 0)))))))
+
+(ert-deftest quotidian-test-review-resize-rerenders-window-from-other-buffer ()
+  (quotidian-test-with-review "Wide."
+    (let ((window (get-buffer-window "*quotidian*")))
+      (cl-letf (((symbol-function 'window-body-width) (lambda (&rest _) 40)))
+        (with-temp-buffer
+          (should-not (derived-mode-p 'quotidian-review-mode))
+          (quotidian-review--resize window)))
+      (with-current-buffer "*quotidian*"
+        (goto-char (point-min))
+        (re-search-forward "^\\( *\\)Wide\\.")
+        (should (= (length (match-string 1)) (/ (- 40 5) 2)))))))
+
+(ert-deftest quotidian-test-review-second-call-grows-history-and-keeps-index ()
+  (quotidian-test-with-scripted-review '("One." "Two.")
+    (let ((configuration quotidian-review--window-configuration))
+      (should (= (length quotidian-review--history) 1))
+      (quotidian)
+      (should (= (length quotidian-review--history) 2))
+      (should (= quotidian-review--index 1))
+      (should (equal (plist-get (quotidian-review--current) :text) "Two."))
+      (should (eq quotidian-review--window-configuration configuration)))))
+
+(ert-deftest quotidian-test-review-render-defaults-to-selected-window ()
+  (quotidian-test-with-review "Selected."
+    (let ((inhibit-read-only t))
+      (erase-buffer))
+    (quotidian-review--render)
+    (should (string-match-p "Selected\\." (buffer-string)))))
+
 (provide 'quotidian-test)
 ;;; quotidian-test.el ends here
