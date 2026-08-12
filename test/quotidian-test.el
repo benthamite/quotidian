@@ -204,11 +204,77 @@ state into each other."
                               "[{\"text\": \"Unlogged.\", \"author\": \"A\"}]")))
     (unwind-protect
         (quotidian-test-with-corpus (list file)
-          (with-current-buffer (get-buffer-create "*Messages*")
-            (let ((inhibit-read-only t)) (erase-buffer))
+          (let ((before (with-current-buffer (get-buffer-create "*Messages*")
+                          (buffer-string))))
             (quotidian-echo)
-            (should-not (string-match-p "Unlogged" (buffer-string)))))
+            (with-current-buffer "*Messages*"
+              (should (equal (buffer-string) before)))))
       (delete-file file))))
+
+(ert-deftest quotidian-test-echo-does-nothing-with-active-minibuffer ()
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"Short.\", \"author\": \"A\"}]")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (cl-letf (((symbol-function 'active-minibuffer-window)
+                     (lambda () t)))
+            (should (null (quotidian-test-capture-message)))))
+      (delete-file file))))
+
+(ert-deftest quotidian-test-echo-returns-nil ()
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"Short.\", \"author\": \"A\"}]")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (should (null (quotidian-echo))))
+      (delete-file file))))
+
+(ert-deftest quotidian-test-echo-does-not-error-on-narrow-frame ()
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"Short.\", \"author\": \"A\"}]")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (cl-letf (((symbol-function 'window-body-width) (lambda (&rest _) 1)))
+            (should (null (quotidian-echo)))))
+      (delete-file file))))
+
+(ert-deftest quotidian-test-invalid-optional-fields-are-dropped ()
+  (quotidian-test-with-corpus
+      (list (quotidian-test-fixture "invalid-optional-fields.json"))
+    (let ((corpus (quotidian--ensure-corpus)))
+      (should (= (length corpus) 1))
+      (should (equal (plist-get (car corpus) :author) "Valid Author")))))
+
+(ert-deftest quotidian-test-reload-reports-skipped-and-dropped ()
+  (let (captured
+        (files (list (quotidian-test-fixture "does-not-exist.json")
+                     (quotidian-test-fixture "invalid-entries.json"))))
+    (quotidian-test-with-corpus files
+      (cl-letf (((symbol-function 'message)
+                 (lambda (format &rest args)
+                   (setq captured (apply #'format format args)))))
+        (quotidian-reload)))
+    (should (string-match-p "1 files skipped" captured))
+    (should (string-match-p "3 entries dropped" captured))))
+
+(ert-deftest quotidian-test-echo-max-lines-clamped-by-resize-mini-windows ()
+  (let ((resize-mini-windows nil)
+        (quotidian-echo-max-lines 4))
+    (should (= (quotidian--echo-max-lines) 1))))
+
+(ert-deftest quotidian-test-echo-max-lines-clamped-by-max-mini-window-height ()
+  (let ((resize-mini-windows t)
+        (max-mini-window-height 0.2)
+        (quotidian-echo-max-lines 10))
+    (cl-letf (((symbol-function 'frame-height) (lambda (&rest _) 20)))
+      (should (= (quotidian--echo-max-lines) 4)))))
+
+(ert-deftest quotidian-test-warn-logs-without-popping ()
+  (when (get-buffer "*Warnings*") (kill-buffer "*Warnings*"))
+  (quotidian--warn "Probe message for warn logging test")
+  (should (get-buffer "*Warnings*"))
+  (should (string-match-p "Probe message for warn logging test"
+                          (with-current-buffer "*Warnings*" (buffer-string)))))
 
 (provide 'quotidian-test)
 ;;; quotidian-test.el ends here

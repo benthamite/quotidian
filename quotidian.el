@@ -31,6 +31,7 @@
 
 (require 'cl-lib)
 (require 'seq)
+(require 'subr-x)
 
 (defgroup quotidian nil
   "Display quotations from authoritative sources."
@@ -48,9 +49,9 @@ Each file is a JSON array of objects.  An object must have the keys
 
 (defcustom quotidian-echo-max-lines 4
   "Greatest height, in lines, of a quotation shown in the echo area.
-Quotations that need more lines are passed over, so that nothing is ever
-cut off in the middle."
-  :type 'integer
+Quotations that need more lines are passed over.  Emacs may still clamp
+this further; see `quotidian-echo'."
+  :type 'natnum
   :group 'quotidian)
 
 (defvar quotidian--corpus 'unset
@@ -58,11 +59,25 @@ cut off in the middle."
 The sentinel distinguishes a corpus that has not been read from one that
 was read and turned out to be empty.")
 
+(defvar quotidian--skipped-files 0
+  "Number of corpus files skipped by the most recent `quotidian-reload'.")
+
+(defvar quotidian--dropped-entries 0
+  "Number of corpus entries dropped by the most recent `quotidian-reload'.")
+
 (defun quotidian-reload ()
-  "Read the corpus files again, discarding the cached quotations."
+  "Read the corpus files again, discarding the cached quotations.
+Report how many quotations were loaded, how many files were skipped,
+and how many entries were dropped; details are logged, quietly, to
+`*Warnings*'."
   (interactive)
-  (setq quotidian--corpus 'unset)
-  (message "Quotidian: %d quotations" (length (quotidian--ensure-corpus))))
+  (setq quotidian--corpus 'unset
+        quotidian--skipped-files 0
+        quotidian--dropped-entries 0)
+  (message "Quotidian: %d quotations, %d files skipped, %d entries dropped"
+           (length (quotidian--ensure-corpus))
+           quotidian--skipped-files
+           quotidian--dropped-entries))
 
 (defun quotidian--ensure-corpus ()
   "Return the quotations, reading them from disk on the first call."
@@ -79,15 +94,17 @@ was read and turned out to be empty.")
 Return nil, after a warning, if FILE is unreadable or is not valid
 JSON."
   (if (not (file-readable-p file))
-      (quotidian--warn "Corpus file not found, skipping it: %s" file)
+      (quotidian--skip-file "Corpus file not found, skipping it: %s" file)
     (condition-case error
         (quotidian--validate (quotidian--parse file) file)
       (json-parse-error
-       (quotidian--warn "Corpus file is not valid JSON, skipping it: %s (%s)"
-                        file (error-message-string error)))
+       (quotidian--skip-file
+        "Corpus file is not valid JSON, skipping it: %s (%s)"
+        file (error-message-string error)))
       (file-error
-       (quotidian--warn "Corpus file could not be read, skipping it: %s (%s)"
-                        file (error-message-string error))))))
+       (quotidian--skip-file
+        "Corpus file could not be read, skipping it: %s (%s)"
+        file (error-message-string error))))))
 
 (defun quotidian--parse (file)
   "Return the JSON array in FILE as a list of plists."
@@ -96,31 +113,50 @@ JSON."
     (json-parse-buffer :object-type 'plist :array-type 'list)))
 
 (defun quotidian--validate (quotes file)
-  "Return the entries of QUOTES that have both text and an author.
+  "Return the valid entries of QUOTES.
 Warn if any entry from FILE is dropped."
   (if (not (listp quotes))
-      (quotidian--warn "Corpus file is not a JSON array, skipping it: %s" file)
+      (quotidian--skip-file "Corpus file is not a JSON array, skipping it: %s"
+                            file)
     (let* ((valid (seq-filter #'quotidian--valid-p quotes))
            (dropped (- (length quotes) (length valid))))
       (when (> dropped 0)
-        (quotidian--warn "Dropped %d entries without text or author: %s"
-                         dropped file))
+        (cl-incf quotidian--dropped-entries dropped)
+        (quotidian--warn "Dropped %d invalid entries: %s" dropped file))
       valid)))
 
 (defun quotidian--valid-p (quote)
-  "Return non-nil if QUOTE is a plist with a non-empty text and author."
+  "Return non-nil if QUOTE is a plist with valid required and optional fields.
+The required `:text' and `:author' must be non-empty strings.  The
+optional `:date' and `:source' must be strings, and the optional
+`:tags' must be a list, whenever present."
   (and (plistp quote)
        (quotidian--non-empty-p (plist-get quote :text))
-       (quotidian--non-empty-p (plist-get quote :author))))
+       (quotidian--non-empty-p (plist-get quote :author))
+       (quotidian--optional-p quote :date #'stringp)
+       (quotidian--optional-p quote :source #'stringp)
+       (quotidian--optional-p quote :tags #'listp)))
 
 (defun quotidian--non-empty-p (value)
   "Return non-nil if VALUE is a string with at least one character."
   (and (stringp value) (not (string= value ""))))
 
+(defun quotidian--optional-p (quote key predicate)
+  "Return non-nil unless QUOTE has KEY set to a value PREDICATE rejects.
+QUOTE lacking KEY at all is acceptable."
+  (let ((value (plist-get quote key)))
+    (or (null value) (funcall predicate value))))
+
+(defun quotidian--skip-file (format &rest args)
+  "Warn with FORMAT and ARGS about a skipped file, and return nil."
+  (cl-incf quotidian--skipped-files)
+  (apply #'quotidian--warn format args))
+
 (defun quotidian--warn (format &rest args)
-  "Warn with FORMAT and ARGS, and return nil.
+  "Log FORMAT and ARGS to `*Warnings*' without popping the buffer.
 Returning nil lets callers use this directly as a failure branch."
-  (display-warning 'quotidian (apply #'format format args) :warning)
+  (let ((warning-suppress-types (cons '(quotidian) warning-suppress-types)))
+    (display-warning 'quotidian (apply #'format format args)))
   nil)
 
 (defface quotidian-quote '((t :inherit default))
@@ -160,6 +196,21 @@ source, if there is one, occupies a second indented line."
 (defconst quotidian--echo-attempts 20
   "How many quotations `quotidian-echo' tries before it gives up.")
 
+;;;###autoload
+(defun quotidian-echo ()
+  "Show a quotation, chosen at random, in the echo area.
+Do nothing, and always return nil, when the minibuffer is in use, when
+the corpus is empty, or when no quotation fits in the echo area.
+Malformed corpus entries are dropped when the corpus is read, so this
+command does not signal on them; see `quotidian--valid-p'."
+  (interactive)
+  (unless (active-minibuffer-window)
+    (when-let* ((filled (quotidian--select-fitting (quotidian--echo-max-lines)
+                                                   (quotidian--echo-width))))
+      (let ((message-log-max nil))
+        (message "%s" filled))))
+  nil)
+
 (defun quotidian--select-fitting (max-lines width)
   "Return a formatted quotation of at most MAX-LINES lines, filled at WIDTH.
 Return nil if `quotidian--echo-attempts' random draws all give a longer
@@ -171,21 +222,6 @@ string, not the quotation itself."
            for filled = (quotidian--fill (quotidian-format quote) width)
            when (<= (quotidian--line-count filled width) max-lines)
            return filled))
-
-;;;###autoload
-(defun quotidian-echo ()
-  "Show a quotation, chosen at random, in the echo area.
-Do nothing when the minibuffer is in use, when the corpus is empty, or
-when no quotation fits within `quotidian-echo-max-lines'.
-
-This function never signals an error, so it is safe to call from a
-hook."
-  (interactive)
-  (unless (active-minibuffer-window)
-    (when-let* ((filled (quotidian--select-fitting quotidian-echo-max-lines
-                                                    (1- (frame-width)))))
-      (let ((message-log-max nil))
-        (message "%s" filled)))))
 
 (defun quotidian--select ()
   "Return a quotation chosen at random, or nil if the corpus is empty."
@@ -225,6 +261,26 @@ A line of STRING wider than WIDTH counts as more than one line, the way
 `message' wraps it in the echo area."
   (cl-loop for line in (split-string string "\n")
            sum (max 1 (ceiling (string-width line) width))))
+
+(defun quotidian--echo-max-lines ()
+  "Return the lesser of `quotidian-echo-max-lines' and what Emacs will show.
+The echo area cannot grow past what `resize-mini-windows' and
+`max-mini-window-height' allow, no matter how tall
+`quotidian-echo-max-lines' is set."
+  (min quotidian-echo-max-lines (quotidian--max-echo-lines)))
+
+(defun quotidian--max-echo-lines ()
+  "Return the greatest number of lines Emacs will grow the echo area to."
+  (if (not resize-mini-windows)
+      1
+    (let ((frame (window-frame (minibuffer-window))))
+      (max 1 (if (floatp max-mini-window-height)
+                 (floor (* max-mini-window-height (frame-height frame)))
+               max-mini-window-height)))))
+
+(defun quotidian--echo-width ()
+  "Return the usable width, in columns, of the echo area."
+  (max 1 (1- (window-body-width (minibuffer-window)))))
 
 (provide 'quotidian)
 ;;; quotidian.el ends here
