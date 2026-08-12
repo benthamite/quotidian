@@ -15,7 +15,7 @@ The package ships public-domain quotations only. To read from a dictionary that 
 
 **Requirements:** Emacs 29.1 or later. No dependencies beyond what Emacs bundles.
 
-The bundled corpus lives in the repository's `data` directory. Elpaca and straight.el build a package from the files its recipe names, and neither copies `data` by default, so **the recipe must name it explicitly** — without that, the package finds no quotations at all.
+The bundled corpus lives in the repository's `data` directory. Elpaca builds a package from the files its recipe names, and does not copy `data` by default, so **the recipe must name it explicitly** — without that, the package finds no quotations at all. Under any other package manager that builds from a files directive of its own, add `data` to that directive in whatever form the manager documents.
 
 ### Elpaca
 
@@ -25,15 +25,6 @@ The bundled corpus lives in the repository's `data` directory. Elpaca and straig
            :repo "benthamite/quotidian"
            :files (:defaults "data"))
   :defer t)
-```
-
-### straight.el
-
-```emacs-lisp
-(use-package quotidian
-  :straight (:host github
-             :repo "benthamite/quotidian"
-             :files (:defaults "data")))
 ```
 
 ### package-vc (built-in since Emacs 30)

@@ -52,9 +52,9 @@ A dictionary of quotations that is still under copyright cannot be redistributed
 
 The bundled corpus lives in the =data= subdirectory of the repository, and ~quotidian-corpus-files~ points at it relative to the file the package was loaded from ([[#h:corpus-files-option][The corpus files]]).
 
-Package managers that build a package by copying a subset of its repository — Elpaca and straight.el among them — copy Lisp files and documentation by default, and nothing else.  Under those managers the =data= directory never reaches the build directory, the default corpus path resolves to a file that is not there, and the package finds no quotations at all: ~quotidian~ signals =No quotations found; check `quotidian-corpus-files'=, and ~quotidian-echo~ shows nothing.
+Elpaca does not copy that directory into the build directory it loads the package from.  Like several package managers, it builds a package from the files its recipe names, and the default set is Lisp files and documentation and nothing else.  The consequence is not subtle: the default corpus path resolves to a file that is not there, and the package finds no quotations at all.  ~quotidian~ signals =No quotations found; check `quotidian-corpus-files'=, and ~quotidian-echo~ shows nothing, on an installation that is otherwise perfectly healthy.
 
-*The recipe must therefore name the =data= directory explicitly*, as the snippets below do.  If you install with =package-vc=, or by cloning the repository yourself, the whole repository is on disk already and no files directive is needed.
+*The recipe must therefore name the =data= directory explicitly*, as the Elpaca snippet below does.  If you install with =package-vc=, or by cloning the repository yourself, the whole repository is on disk already and no files directive is needed.
 
 ** Manual installation
 :PROPERTIES:
@@ -69,7 +69,7 @@ Clone the repository, keeping its =data= directory, add it to your load path, an
 (require 'quotidian-review)
 #+end_src
 
-Requiring =quotidian-review.el= is what defines the ~quotidian~ command.  Under a package manager no ~require~ is needed: ~quotidian~ and ~quotidian-echo~ are autoloaded, so ~:defer t~ is safe, and calling either of them loads the rest of the package — ~quotidian-reload~ among it ([[#h:reloading][Reloading the corpus]]).
+Requiring =quotidian-review.el= is what defines the ~quotidian~ command.  Under a package manager no ~require~ is needed: all three entry points — ~quotidian~, ~quotidian-echo~ and ~quotidian-reload~ — are autoloaded, so ~:defer t~ is safe and =M-x= finds each of them before anything has loaded the package.  The commands of the review buffer are not autoloaded and do not need to be, since they only ever run in a buffer that ~quotidian~ has already opened.
 
 ** Installation with use-package
 :PROPERTIES:
@@ -86,16 +86,12 @@ If you use ~use-package~, add one of the following snippets to your init file:
            :files (:defaults "data"))
   :defer t)
 
-;; with straight
-(use-package quotidian
-  :straight (:host github
-             :repo "benthamite/quotidian"
-             :files (:defaults "data")))
-
 ;; with vc (Emacs 30 or later)
 (use-package quotidian
   :vc (:url "https://github.com/benthamite/quotidian"))
 #+end_src
+
+The Elpaca recipe is the one the package is developed against, and its ~:files~ entry is there for the reason given above.  Under any other package manager that builds from a files directive of its own, add the =data= directory to that directive in whatever form the manager documents; under one that puts the whole repository on the load path, nothing needs adding.
 
 * Corpus files
 :PROPERTIES:

@@ -65,6 +65,7 @@ was read and turned out to be empty.")
 (defvar quotidian--dropped-entries 0
   "Number of corpus entries dropped by the most recent `quotidian-reload'.")
 
+;;;###autoload
 (defun quotidian-reload ()
   "Read the corpus files again, discarding the cached quotations.
 Report how many quotations were loaded, how many files were skipped,
