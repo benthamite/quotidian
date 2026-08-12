@@ -21,6 +21,21 @@ public-domain quotations; add a file of your own to the list to include more.
 If you edit a corpus file while Emacs is running, call ~quotidian-reload~ to
 re-read the files and discard the cached quotations.
 
+** Echo area
+
+Call ~quotidian-echo~ from any hook that fires when you are waiting:
+
+#+begin_src emacs-lisp
+(add-hook 'compilation-start-hook (lambda (_process) (quotidian-echo)))
+#+end_src
+
+The function never signals an error and never writes to ~*Messages*~, so
+it is safe to attach to a hook that fires often.
+
+~quotidian-echo-max-lines~ (default 4) bounds how tall the quotation may
+be. Quotations that would need more lines are passed over, so nothing
+is ever cut off in the echo area.
+
 * Corpus files
 
 Each corpus file is a JSON array of objects, one per quotation:

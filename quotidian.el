@@ -46,6 +46,13 @@ Each file is a JSON array of objects.  An object must have the keys
   :type '(repeat file)
   :group 'quotidian)
 
+(defcustom quotidian-echo-max-lines 4
+  "Greatest height, in lines, of a quotation shown in the echo area.
+Quotations that need more lines are passed over, so that nothing is ever
+cut off in the middle."
+  :type 'integer
+  :group 'quotidian)
+
 (defvar quotidian--corpus 'unset
   "Parsed quotations, or `unset' if they have not been read yet.
 The sentinel distinguishes a corpus that has not been read from one that
@@ -164,6 +171,21 @@ string, not the quotation itself."
            for filled = (quotidian--fill (quotidian-format quote) width)
            when (<= (quotidian--line-count filled width) max-lines)
            return filled))
+
+;;;###autoload
+(defun quotidian-echo ()
+  "Show a quotation, chosen at random, in the echo area.
+Do nothing when the minibuffer is in use, when the corpus is empty, or
+when no quotation fits within `quotidian-echo-max-lines'.
+
+This function never signals an error, so it is safe to call from a
+hook."
+  (interactive)
+  (unless (active-minibuffer-window)
+    (when-let* ((filled (quotidian--select-fitting quotidian-echo-max-lines
+                                                    (1- (frame-width)))))
+      (let ((message-log-max nil))
+        (message "%s" filled)))))
 
 (defun quotidian--select ()
   "Return a quotation chosen at random, or nil if the corpus is empty."

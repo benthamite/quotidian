@@ -6,6 +6,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'ert)
 (require 'quotidian)
 
@@ -16,6 +17,15 @@
 (defun quotidian-test-fixture (name)
   "Return the absolute path of fixture NAME."
   (expand-file-name (concat "fixtures/" name) quotidian-test-directory))
+
+(defun quotidian-test-capture-message ()
+  "Call `quotidian-echo' and return the string it passed to `message'."
+  (let (captured)
+    (cl-letf (((symbol-function 'message)
+               (lambda (format &rest args)
+                 (setq captured (apply #'format format args)))))
+      (quotidian-echo))
+    captured))
 
 (defmacro quotidian-test-with-corpus (files &rest body)
   "Evaluate BODY with `quotidian-corpus-files' bound to FILES.
@@ -164,6 +174,40 @@ state into each other."
     (unwind-protect
         (quotidian-test-with-corpus (list file)
           (should (null (quotidian--select-fitting 2 40))))
+      (delete-file file))))
+
+(ert-deftest quotidian-test-echo-displays-a-quotation ()
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"Short.\", \"author\": \"A\"}]")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (should (string-match-p "Short\\." (quotidian-test-capture-message))))
+      (delete-file file))))
+
+(ert-deftest quotidian-test-echo-on-empty-corpus-is-silent ()
+  (quotidian-test-with-corpus nil
+    (should (null (quotidian-test-capture-message)))))
+
+(ert-deftest quotidian-test-echo-with-no-fitting-quote-is-silent ()
+  (let ((file (make-temp-file
+               "quotidian-test" nil ".json"
+               (concat "[{\"text\": \"" (string-join (make-list 200 "word") " ")
+                       "\", \"author\": \"A\"}]"))))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (let ((quotidian-echo-max-lines 2))
+            (should (null (quotidian-test-capture-message)))))
+      (delete-file file))))
+
+(ert-deftest quotidian-test-echo-does-not-log ()
+  (let ((file (make-temp-file "quotidian-test" nil ".json"
+                              "[{\"text\": \"Unlogged.\", \"author\": \"A\"}]")))
+    (unwind-protect
+        (quotidian-test-with-corpus (list file)
+          (with-current-buffer (get-buffer-create "*Messages*")
+            (let ((inhibit-read-only t)) (erase-buffer))
+            (quotidian-echo)
+            (should-not (string-match-p "Unlogged" (buffer-string)))))
       (delete-file file))))
 
 (provide 'quotidian-test)
