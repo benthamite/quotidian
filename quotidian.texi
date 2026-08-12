@@ -238,7 +238,24 @@ An entry is dropped, and the rest of the file is kept, when any of the following
 @samp{tags} is present but is not a list.
 @end itemize
 
-A whole file is skipped when it cannot be read — because it is missing, is not readable, or fails for any other file error — or when its contents are not valid JSON@.
+A whole file is skipped, and none of its quotations are read, for any of three reasons:
+
+@itemize
+@item
+It cannot be read: it is missing, it is not readable, or it fails for some other file error.
+@item
+Its contents are not valid JSON@.
+@item
+Its contents are valid JSON but not an array — a bare number or string, or an object.
+@end itemize
+
+The last of those is worth a word, because wrapping the array in an object is a natural first attempt:
+
+@example
+@{ "quotes": [ @{ "text": "…", "author": "…" @} ] @}
+@end example
+
+That file is skipped whole, with the warning @samp{Corpus file is a JSON object, not an array, skipping it}.  The entries inside are never looked at and are not counted as dropped, since there is nothing wrong with them: the outer shape is the mistake.  Remove the wrapper and leave the array at the top level.
 
 @node Warnings and reloading
 @section Warnings and reloading
@@ -279,7 +296,7 @@ Add your own files to the list to read more than the bundled twenty:
 (add-to-list 'quotidian-corpus-files "~/quotations/oxford.json" t)
 @end lisp
 
-Every file is read and the quotations are pooled; a quotation is then chosen from the pool at random, so a file ten times the size of another contributes ten times as often.  Removing the bundled file from the list leaves only your own.  Changing the option takes effect after @code{quotidian-reload} (@ref{Warnings and reloading}).
+Every file is read and the quotations are pooled; a quotation is then chosen from the pool at random, so a file ten times the size of another contributes ten times as often.  The draw is with replacement, and the package keeps no record of what you have already been shown, so the same quotation can come up twice in a row; on a small corpus it will, often.  Removing the bundled file from the list leaves only your own.  Changing the option takes effect after @code{quotidian-reload} (@ref{Warnings and reloading}).
 
 @node The height of the echo area
 @section The height of the echo area
@@ -372,7 +389,7 @@ The command @code{quotidian} opens the @samp{*quotidian*} buffer, deletes the ot
 
 The command signals a @code{user-error} if the corpus holds no quotations, since there is nothing to open the buffer for.  A corpus that reads as empty under a package manager is usually the missing @samp{data} directory (@ref{The @samp{data} directory is part of the package, , The data directory is part of the package}).
 
-Quotations you have seen are kept in a history, one per review buffer, so moving forwards and backwards walks the same sequence rather than drawing at random each time.  Calling @code{quotidian} again while the review buffer is already open adds a new quotation to the end of that history and shows it; it does not reset the history, and it does not overwrite the window layout the buffer will restore.
+Quotations you have seen are kept in a history, one per review buffer, so moving forwards and backwards walks the same sequence rather than drawing at random each time.  Each fresh draw is nevertheless independent of the ones before it, so the history is not a tour of the corpus without repeats: a quotation can be drawn again while it is still in the history, and on a small corpus it soon will be.  Calling @code{quotidian} again while the review buffer is already open adds a new quotation to the end of that history and shows it; it does not reset the history, and it does not overwrite the window layout the buffer will restore.
 
 @menu
 * Key bindings::
@@ -410,7 +427,7 @@ The keymap @code{quotidian-review-mode-map} binds five keys:
 @tab Leave, restoring the previous window layout
 @end multitable
 
-Every other key keeps the binding @code{special-mode} gives it.
+Every other key keeps the binding @code{special-mode} gives it.  One of those is worth knowing: @samp{g} runs @code{revert-buffer}, and the mode makes that draw the current quotation again rather than fail for want of a file to revert.  Use it after changing @code{quotidian-review-fill-column} (@ref{The width of the review buffer}) to see the new width without moving on to another quotation.
 
 The command @code{quotidian-review-next} steps forward through the history when there is anything ahead, and draws a new quotation at random when there is not.  It signals a @code{user-error} if the corpus has become empty since the buffer was opened — if you emptied @code{quotidian-corpus-files} and reloaded, for instance — rather than showing an empty screen.
 

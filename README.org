@@ -139,7 +139,19 @@ An entry is dropped, and the rest of the file is kept, when any of the following
 - =source= or =date= is present but is not a string.
 - =tags= is present but is not a list.
 
-A whole file is skipped when it cannot be read — because it is missing, is not readable, or fails for any other file error — or when its contents are not valid JSON.
+A whole file is skipped, and none of its quotations are read, for any of three reasons:
+
+- It cannot be read: it is missing, it is not readable, or it fails for some other file error.
+- Its contents are not valid JSON.
+- Its contents are valid JSON but not an array — a bare number or string, or an object.
+
+The last of those is worth a word, because wrapping the array in an object is a natural first attempt:
+
+#+begin_src json
+{ "quotes": [ { "text": "…", "author": "…" } ] }
+#+end_src
+
+That file is skipped whole, with the warning =Corpus file is a JSON object, not an array, skipping it=.  The entries inside are never looked at and are not counted as dropped, since there is nothing wrong with them: the outer shape is the mistake.  Remove the wrapper and leave the array at the top level.
 
 ** Warnings and reloading
 :PROPERTIES:
@@ -180,7 +192,7 @@ Add your own files to the list to read more than the bundled twenty:
 (add-to-list 'quotidian-corpus-files "~/quotations/oxford.json" t)
 #+end_src
 
-Every file is read and the quotations are pooled; a quotation is then chosen from the pool at random, so a file ten times the size of another contributes ten times as often.  Removing the bundled file from the list leaves only your own.  Changing the option takes effect after ~quotidian-reload~ ([[#h:warnings-and-reloading][Warnings and reloading]]).
+Every file is read and the quotations are pooled; a quotation is then chosen from the pool at random, so a file ten times the size of another contributes ten times as often.  The draw is with replacement, and the package keeps no record of what you have already been shown, so the same quotation can come up twice in a row; on a small corpus it will, often.  Removing the bundled file from the list leaves only your own.  Changing the option takes effect after ~quotidian-reload~ ([[#h:warnings-and-reloading][Warnings and reloading]]).
 
 ** The height of the echo area
 :PROPERTIES:
@@ -270,7 +282,7 @@ The command ~quotidian~ opens the =*quotidian*= buffer, deletes the other window
 
 The command signals a ~user-error~ if the corpus holds no quotations, since there is nothing to open the buffer for.  A corpus that reads as empty under a package manager is usually the missing =data= directory ([[#h:data-directory][The data directory is part of the package]]).
 
-Quotations you have seen are kept in a history, one per review buffer, so moving forwards and backwards walks the same sequence rather than drawing at random each time.  Calling ~quotidian~ again while the review buffer is already open adds a new quotation to the end of that history and shows it; it does not reset the history, and it does not overwrite the window layout the buffer will restore.
+Quotations you have seen are kept in a history, one per review buffer, so moving forwards and backwards walks the same sequence rather than drawing at random each time.  Each fresh draw is nevertheless independent of the ones before it, so the history is not a tour of the corpus without repeats: a quotation can be drawn again while it is still in the history, and on a small corpus it soon will be.  Calling ~quotidian~ again while the review buffer is already open adds a new quotation to the end of that history and shows it; it does not reset the history, and it does not overwrite the window layout the buffer will restore.
 
 *** Key bindings
 :PROPERTIES:
@@ -293,7 +305,7 @@ The keymap ~quotidian-review-mode-map~ binds five keys:
 | =w=   | ~quotidian-review-copy~     | Copy the quotation and its attribution      |
 | =q=   | ~quotidian-review-quit~     | Leave, restoring the previous window layout |
 
-Every other key keeps the binding ~special-mode~ gives it.
+Every other key keeps the binding ~special-mode~ gives it.  One of those is worth knowing: =g= runs ~revert-buffer~, and the mode makes that draw the current quotation again rather than fail for want of a file to revert.  Use it after changing ~quotidian-review-fill-column~ ([[#h:review-fill-column-option][The width of the review buffer]]) to see the new width without moving on to another quotation.
 
 The command ~quotidian-review-next~ steps forward through the history when there is anything ahead, and draws a new quotation at random when there is not.  It signals a ~user-error~ if the corpus has become empty since the buffer was opened — if you emptied ~quotidian-corpus-files~ and reloaded, for instance — rather than showing an empty screen.
 

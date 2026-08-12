@@ -92,8 +92,8 @@ and how many entries were dropped; details are logged, quietly, to
 
 (defun quotidian--read-file (file)
   "Return the valid quotations in FILE.
-Return nil, after a warning, if FILE is unreadable or is not valid
-JSON."
+Return nil, after a warning, if FILE is unreadable, is not valid JSON,
+or holds something other than a JSON array."
   (if (not (file-readable-p file))
       (quotidian--skip-file "Corpus file not found, skipping it: %s" file)
     (condition-case error
@@ -108,23 +108,55 @@ JSON."
         file (error-message-string error))))))
 
 (defun quotidian--parse (file)
-  "Return the JSON array in FILE as a list of plists."
+  "Return the JSON value in FILE, consed onto its top-level shape.
+The value is parsed with objects as plists and arrays as lists, which
+makes the two indistinguishable afterwards; hence the shape, read from
+the text itself by `quotidian--json-shape'."
   (with-temp-buffer
     (insert-file-contents file)
-    (json-parse-buffer :object-type 'plist :array-type 'list)))
+    (let ((value (json-parse-buffer :object-type 'plist :array-type 'list)))
+      (cons value (quotidian--json-shape)))))
 
-(defun quotidian--validate (quotes file)
+(defun quotidian--json-shape ()
+  "Return the shape of the JSON value in the current buffer.
+The shape is `array' for a value opening with a bracket, `object' for
+one opening with a brace, and `atom' for anything else."
+  (goto-char (point-min))
+  (skip-chars-forward " \t\n\r\f")
+  (pcase (char-after)
+    (?\[ 'array)
+    (?\{ 'object)
+    (_ 'atom)))
+
+(defun quotidian--validate (parsed file)
+  "Return the valid entries of PARSED, the parse of FILE.
+PARSED is what `quotidian--parse' returns: the JSON value consed onto
+its top-level shape.  Warn if FILE holds no JSON array, or if any of
+its entries is dropped."
+  (pcase-let ((`(,quotes . ,shape) parsed))
+    (if (eq shape 'array)
+        (quotidian--keep-valid quotes file)
+      (quotidian--skip-shape shape file))))
+
+(defun quotidian--keep-valid (quotes file)
   "Return the valid entries of QUOTES.
 Warn if any entry from FILE is dropped."
-  (if (not (listp quotes))
-      (quotidian--skip-file "Corpus file is not a JSON array, skipping it: %s"
-                            file)
-    (let* ((valid (seq-filter #'quotidian--valid-p quotes))
-           (dropped (- (length quotes) (length valid))))
-      (when (> dropped 0)
-        (cl-incf quotidian--dropped-entries dropped)
-        (quotidian--warn "Dropped %d invalid entries: %s" dropped file))
-      valid)))
+  (let* ((valid (seq-filter #'quotidian--valid-p quotes))
+         (dropped (- (length quotes) (length valid))))
+    (when (> dropped 0)
+      (cl-incf quotidian--dropped-entries dropped)
+      (quotidian--warn "Dropped %d invalid entries: %s" dropped file))
+    valid))
+
+(defun quotidian--skip-shape (shape file)
+  "Warn that FILE holds SHAPE where an array was wanted, and return nil.
+The object case is named for what it is, because wrapping the array in
+an object is a likely first attempt and the entries are not at fault."
+  (if (eq shape 'object)
+      (quotidian--skip-file
+       "Corpus file is a JSON object, not an array, skipping it: %s" file)
+    (quotidian--skip-file "Corpus file is not a JSON array, skipping it: %s"
+                          file)))
 
 (defun quotidian--valid-p (quote)
   "Return non-nil if QUOTE is a plist with valid required and optional fields.

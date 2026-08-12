@@ -1,0 +1,12 @@
+{
+  "quotes": [
+    {
+      "text": "A wrapped quotation.",
+      "author": "Wrapped Author"
+    },
+    {
+      "text": "Another wrapped quotation.",
+      "author": "Wrapped Author"
+    }
+  ]
+}

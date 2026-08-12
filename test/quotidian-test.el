@@ -59,6 +59,30 @@ state into each other."
   (quotidian-test-with-corpus (list (quotidian-test-fixture "malformed.json"))
     (should (null (quotidian--ensure-corpus)))))
 
+(ert-deftest quotidian-test-object-wrapped-array-is-skipped ()
+  (let (warnings)
+    (cl-letf (((symbol-function 'quotidian--warn)
+               (lambda (format &rest args)
+                 (push (apply #'format format args) warnings)
+                 nil)))
+      (quotidian-test-with-corpus
+          (list (quotidian-test-fixture "object-wrapper.json"))
+        (let ((quotidian--skipped-files 0)
+              (quotidian--dropped-entries 0))
+          (should (null (quotidian--ensure-corpus)))
+          (should (= quotidian--skipped-files 1))
+          (should (= quotidian--dropped-entries 0)))))
+    (should (string-match-p "JSON object" (car warnings)))
+    (should-not (string-match-p "Dropped" (car warnings)))))
+
+(ert-deftest quotidian-test-scalar-file-is-skipped ()
+  (quotidian-test-with-corpus (list (quotidian-test-fixture "scalar.json"))
+    (let ((quotidian--skipped-files 0)
+          (quotidian--dropped-entries 0))
+      (should (null (quotidian--ensure-corpus)))
+      (should (= quotidian--skipped-files 1))
+      (should (= quotidian--dropped-entries 0)))))
+
 (ert-deftest quotidian-test-invalid-entries-are-dropped ()
   (quotidian-test-with-corpus (list (quotidian-test-fixture "invalid-entries.json"))
     (let ((corpus (quotidian--ensure-corpus)))
@@ -421,6 +445,12 @@ deterministic."
     (quotidian-review-previous)
     (should (string-match-p "One\\." (buffer-string)))
     (should (zerop quotidian-review--index))))
+
+(ert-deftest quotidian-test-review-revert-redraws-without-advancing ()
+  (quotidian-test-with-scripted-review '("One." "Two.")
+    (revert-buffer)
+    (should (string-match-p "One\\." (buffer-string)))
+    (should (equal (plist-get (quotidian-review--current) :text) "One."))))
 
 (ert-deftest quotidian-test-review-copy-includes-attribution ()
   (let ((kill-ring nil) (kill-ring-yank-pointer nil))

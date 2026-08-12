@@ -70,11 +70,19 @@
 (define-derived-mode quotidian-review-mode special-mode "Quotidian"
   "Major mode for reading quotations one at a time."
   (setq-local cursor-type nil)
+  (setq-local revert-buffer-function #'quotidian-review--revert)
   (setq-local mode-line-format
               (propertize " n next   p previous   w copy   q quit"
                           'face 'shadow))
   (add-hook 'window-size-change-functions #'quotidian-review--resize nil t)
   (add-hook 'kill-buffer-hook #'quotidian-review--restore-windows nil t))
+
+(defun quotidian-review--revert (&rest _)
+  "Draw the current quotation again, whatever arguments are passed.
+`special-mode' binds \\`g' to `revert-buffer', which has no file to
+revert here.  Drawing the quotation again is what reverting a review
+buffer can sensibly mean, and it keeps the key from signalling."
+  (quotidian-review--render))
 
 (defun quotidian-review-next ()
   "Show the next quotation.
