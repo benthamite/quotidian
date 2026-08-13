@@ -6,3 +6,8 @@
 # but not published with the package.
 /docs/superpowers/
 /.superpowers/
+
+# Session bookkeeping, kept local to this working copy.
+/logs/
+/CLAUDE.md
+/AGENTS.md
