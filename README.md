@@ -56,7 +56,7 @@ The default value of `quotidian-corpus-files` is `(bundled)`, the symbol standin
 
 ## Documentation
 
-For a comprehensive description of the corpus format, all user options, commands, and faces, see the [manual](README.org).
+For a comprehensive description of the corpus format, all user options, commands, and faces, see the [manual](https://stafforini.com/notes/quotidian/).
 
 ## Tests
 
